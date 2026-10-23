@@ -34,7 +34,8 @@ test("public pages, links, layout and honest account availability", async ({
     ).violations,
   ).toEqual([]);
   await page
-    .getByText("ยังไม่มีรายละเอียดครบ เริ่มคุยได้ไหม?", { exact: true })
+    .locator("summary")
+    .filter({ hasText: "ยังไม่มีรายละเอียดครบ เริ่มคุยได้ไหม?" })
     .click();
   await expect(
     page.getByText("ได้ เลือกประเภทงานและเล่าว่าอยากแก้ปัญหาอะไรในแบบฟอร์ม", {

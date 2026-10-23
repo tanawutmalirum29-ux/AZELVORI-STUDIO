@@ -4,6 +4,9 @@ import {
   BUDGETS,
   BUDGET_LABELS,
   LeadSchema,
+  LeadDetailsSchema,
+  LeadTimingSchema,
+  LeadReferencesSchema,
   PRIVACY_VERSION,
   SERVICE_LABELS,
   SERVICE_TYPES,
@@ -84,28 +87,17 @@ export function Start() {
     if (step > 0) heading.current?.focus();
   }, [step]);
   function validation(final: boolean) {
-    const result = LeadSchema.safeParse(data);
-    const relevant =
-      step === 1
-        ? [
-            "title",
-            "description",
-            "platform",
-            "engine",
-            "expected",
-            "actual",
-            "reproduction",
-          ]
+    const schema = final
+      ? LeadSchema
+      : step === 1
+        ? LeadDetailsSchema
         : step === 2
-          ? ["budget", "timeline", "targetDate"]
+          ? LeadTimingSchema
           : step === 3
-            ? ["referenceUrl", "rightsConfirmed"]
-            : [];
-    const issues = result.success
-      ? []
-      : result.error.issues.filter(
-          (i) => final || relevant.includes(String(i.path[0])),
-        );
+            ? LeadReferencesSchema
+            : undefined;
+    const result = schema?.safeParse(data);
+    const issues = result && !result.success ? result.error.issues : [];
     const nextErrors = Object.fromEntries(
       issues.map((i) => [i.path.join("."), i.message]),
     );
@@ -281,6 +273,10 @@ export function Start() {
       <div className="wizard-panel">
         <div
           className="wizard-progress"
+          role="progressbar"
+          aria-valuemin={1}
+          aria-valuemax={5}
+          aria-valuenow={step + 1}
           aria-label={`ขั้นตอน ${step + 1} จาก 5`}
         >
           <span style={{ width: `${(step + 1) * 20}%` }} />

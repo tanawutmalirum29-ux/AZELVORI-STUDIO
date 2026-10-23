@@ -32,7 +32,7 @@ export const BUDGET_LABELS: Record<(typeof BUDGETS)[number], string> = {
 export const PRIVACY_VERSION = "alpha-2026-10-23";
 const shortText = z.string().trim().max(200);
 const optionalText = z.string().trim().max(3000).default("");
-export const LeadSchema = z
+const LeadFields = z
   .object({
     serviceType: z.enum(SERVICE_TYPES),
     title: shortText.min(5, "ระบุชื่อโปรเจกต์อย่างน้อย 5 ตัวอักษร"),
@@ -78,48 +78,91 @@ export const LeadSchema = z
     rightsConfirmed: z.boolean(),
     website: z.string().max(200).default(""),
   })
-  .strict()
-  .superRefine((data, ctx) => {
-    if (data.serviceType === "GAME_BUGFIX") {
-      for (const key of [
-        "engine",
-        "expected",
-        "actual",
-        "reproduction",
-      ] as const)
-        if (data[key].length < 3)
-          ctx.addIssue({
-            code: "custom",
-            path: [key],
-            message: "กรอกข้อมูลสำหรับวิเคราะห์บั๊ก",
-          });
-    }
-    if (data.serviceType === "GAME_NEW" && data.engine.length < 2)
-      ctx.addIssue({
-        code: "custom",
-        path: ["engine"],
-        message: "ระบุเอนจิน หรือเลือกให้ช่วยแนะนำ",
-      });
-    if (!data.rightsConfirmed)
-      ctx.addIssue({
-        code: "custom",
-        path: ["rightsConfirmed"],
-        message: "ยืนยันสิทธิ์ในเนื้อหาและไฟล์ที่จะใช้",
-      });
-    if (data.timeline === "SPECIFIC") {
-      const valid =
-        /^\d{4}-\d{2}-\d{2}$/.test(data.targetDate) &&
-        Number.isFinite(Date.parse(data.targetDate)) &&
-        new Date(data.targetDate).toISOString().slice(0, 10) ===
-          data.targetDate;
-      if (!valid)
+  .strict();
+type LeadFieldsOutput = z.output<typeof LeadFields>;
+function validateDetails(
+  data: Pick<
+    LeadFieldsOutput,
+    "serviceType" | "engine" | "expected" | "actual" | "reproduction"
+  >,
+  ctx: z.RefinementCtx,
+) {
+  if (data.serviceType === "GAME_BUGFIX") {
+    for (const key of ["engine", "expected", "actual", "reproduction"] as const)
+      if (data[key].length < 3)
         ctx.addIssue({
           code: "custom",
-          path: ["targetDate"],
-          message: "เลือกวันที่ที่ถูกต้อง",
+          path: [key],
+          message: "กรอกข้อมูลสำหรับวิเคราะห์บั๊ก",
         });
-    }
-  });
+  }
+  if (data.serviceType === "GAME_NEW" && data.engine.length < 2)
+    ctx.addIssue({
+      code: "custom",
+      path: ["engine"],
+      message: "ระบุเอนจิน หรือเลือกให้ช่วยแนะนำ",
+    });
+}
+function validateTiming(
+  data: Pick<LeadFieldsOutput, "timeline" | "targetDate">,
+  ctx: z.RefinementCtx,
+) {
+  if (data.timeline === "SPECIFIC") {
+    const valid =
+      /^\d{4}-\d{2}-\d{2}$/.test(data.targetDate) &&
+      Number.isFinite(Date.parse(data.targetDate)) &&
+      new Date(data.targetDate).toISOString().slice(0, 10) === data.targetDate;
+    if (!valid)
+      ctx.addIssue({
+        code: "custom",
+        path: ["targetDate"],
+        message: "เลือกวันที่ที่ถูกต้อง",
+      });
+  }
+}
+function validateRights(
+  data: Pick<LeadFieldsOutput, "rightsConfirmed">,
+  ctx: z.RefinementCtx,
+) {
+  if (!data.rightsConfirmed)
+    ctx.addIssue({
+      code: "custom",
+      path: ["rightsConfirmed"],
+      message: "ยืนยันสิทธิ์ในเนื้อหาและไฟล์ที่จะใช้",
+    });
+}
+// Validate only the current step. Unanswered consent on a later step must
+// never prevent conditional checks such as game reproduction requirements.
+export const LeadDetailsSchema = LeadFields.pick({
+  serviceType: true,
+  title: true,
+  description: true,
+  platform: true,
+  engine: true,
+  expected: true,
+  actual: true,
+  reproduction: true,
+})
+  .strip()
+  .superRefine(validateDetails);
+export const LeadTimingSchema = LeadFields.pick({
+  budget: true,
+  timeline: true,
+  targetDate: true,
+})
+  .strip()
+  .superRefine(validateTiming);
+export const LeadReferencesSchema = LeadFields.pick({
+  referenceUrl: true,
+  rightsConfirmed: true,
+})
+  .strip()
+  .superRefine(validateRights);
+export const LeadSchema = LeadFields.superRefine((data, ctx) => {
+  validateDetails(data, ctx);
+  validateTiming(data, ctx);
+  validateRights(data, ctx);
+});
 export type LeadInput = z.input<typeof LeadSchema>;
 export type Lead = z.output<typeof LeadSchema>;
 export const LEAD_STATUSES = [

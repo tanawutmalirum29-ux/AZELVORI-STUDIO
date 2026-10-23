@@ -570,7 +570,7 @@ button {
   border-top: 1px solid #384a3d25;
   padding-top: 9px;
   gap: 12px;
-  color: #697064;
+  color: #56604f;
 }
 .sculpture {
   position: relative;
@@ -715,7 +715,7 @@ button {
 .service-index {
   font-size: 12px;
   font-family: monospace;
-  color: #69747e;
+  color: #9aa6b1;
 }
 .service-card .eyebrow {
   font-size: 8px;

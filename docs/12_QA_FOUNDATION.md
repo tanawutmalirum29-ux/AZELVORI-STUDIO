@@ -8,7 +8,7 @@ Date: 2026-10-23 (Asia/Bangkok). Baseline before implementation: `842b8c6cd66545
 |---|---|---|
 | TypeScript | PASS | Frontend, shared contracts, API, IaC and tests |
 | Production frontend + Lambda bundle | PASS | Vite split chunks and esbuild Node 22 target |
-| Unit / HTTP integration / Dynamo contract / infrastructure tests | 57 PASS | Five test files; no live AWS connection |
+| Unit / HTTP integration / Dynamo contract / infrastructure tests | 60 PASS | Five test files; no live AWS connection |
 | AWS CDK synthesis | PASS | Generates CloudFormation with intake disabled, MFA, JWT scopes, table protection and constrained IAM |
 | Dependency audit | PASS, zero reported vulnerabilities after repair | `npm audit`; point-in-time tool result, not a full security audit |
 | Cloud Chromium interactive smoke | PASS | Website → all five wizard stages → explicit local draft download; no fake submission success |
@@ -25,6 +25,9 @@ Date: 2026-10-23 (Asia/Bangkok). Baseline before implementation: `842b8c6cd66545
 - Successful submission exports now include the real receipt; unsent drafts are labeled `LOCAL_DRAFT_NOT_SUBMITTED`.
 - Server target-date validation uses Asia/Bangkok to match the Thai frontend.
 - Full dependency audit identified a low-severity esbuild development-server advisory. Updated the direct dependency to patched 0.28.1 and revalidated the build.
+
+- Browser CI exposed low-contrast service numbering and concept footer text. Increased contrast and marked decorative symbols as hidden from assistive technology.
+- Browser CI exposed skipped conditional wizard validation when later consent was still unanswered. Shared per-step schemas now validate debugging fields, dates and rights independently; full strict server validation remains in place. Added three regression tests and manually confirmed all seven missing debugging fields report errors.
 
 ## Security and business regression coverage
 

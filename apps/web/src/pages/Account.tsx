@@ -248,7 +248,7 @@ export function Admin() {
         </Notice>
       )}
       <div className="crm-layout">
-        <div className="lead-list" aria-label="รายการบรีฟ">
+        <div className="lead-list" role="region" aria-label="รายการบรีฟ">
           {busy && !leads.length && <p role="status">กำลังโหลดบรีฟ…</p>}
           {!busy && !leads.length && (
             <div className="empty-state">

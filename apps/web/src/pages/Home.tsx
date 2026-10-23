@@ -5,6 +5,7 @@ export function ConceptSite({ compact = false }: { compact?: boolean }) {
   return (
     <div
       className={`concept-site ${compact ? "compact" : ""}`}
+      role="img"
       aria-label="ตัวอย่างดีไซน์เว็บไซต์ ORBIT"
     >
       <div className="concept-nav">
@@ -73,8 +74,12 @@ export function Home() {
         <div className="hero-art">
           <div className="orbit-line orbit-one" />
           <div className="orbit-line orbit-two" />
-          <div className="art-cross cross-one">+</div>
-          <div className="art-cross cross-two">+</div>
+          <div className="art-cross cross-one" aria-hidden="true">
+            +
+          </div>
+          <div className="art-cross cross-two" aria-hidden="true">
+            +
+          </div>
           <div className="hero-window">
             <div className="window-bar">
               <div className="window-dots">
@@ -327,7 +332,7 @@ export function Home() {
             <details key={q}>
               <summary>
                 {q}
-                <span>+</span>
+                <span aria-hidden="true">+</span>
               </summary>
               <p>{a}</p>
             </details>
