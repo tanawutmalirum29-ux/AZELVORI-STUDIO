@@ -1,6 +1,6 @@
 [
   {
-    "source": "</^[^.]+$|\\.(?!(css|gif|ico|jpg|js|png|txt|svg|woff|woff2|ttf|map|json)$)([^.]+$)/>",
+    "source": "</^[^.]+$|\\.(?!(css|gif|ico|jpe?g|js|mjs|png|txt|svg|woff2?|ttf|map|json|webp|avif|webmanifest|mp4|pdf)$)([^.]+$)/>",
     "target": "/index.html",
     "status": "200"
   }
