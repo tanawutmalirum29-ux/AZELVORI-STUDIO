@@ -420,7 +420,9 @@ test("admin saves follow-up, retries without losing draft and reopens an existin
   state.created = true;
   await page.goto("/admin");
   await page.getByRole("button", { name: new RegExp(validLead.title) }).click();
-  await page.getByLabel("ความสำคัญ", { exact: true }).selectOption("HIGH");
+  await page
+    .getByRole("combobox", { name: "ความสำคัญ", exact: true })
+    .selectOption("HIGH");
   await page.getByLabel("วันนัดติดตาม", { exact: true }).fill("2026-01-01");
   const note = page.getByRole("textbox", { name: "โน้ตภายใน", exact: true });
   await note.fill("<script>private note</script> โทรติดตามรายละเอียดงาน");
