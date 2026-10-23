@@ -16,6 +16,13 @@ const mustExist = (path) => {
 const htmlPath = join(dist, "index.html");
 mustExist(htmlPath);
 mustExist(join(dist, "favicon.svg"));
+mustExist(join(dist, "favicon.png"));
+mustExist(join(dist, "apple-touch-icon.png"));
+mustExist(join(dist, "brand/azelvori-symbol.svg"));
+mustExist(join(dist, "brand/azelvori-logo-horizontal.svg"));
+mustExist(join(dist, "brand/azelvori-social-cover.png"));
+mustExist(join(dist, "brand/azelvori-home-hero.svg"));
+mustExist(join(dist, "brand/azelvori-home-mobile.svg"));
 mustExist(join(dist, "robots.txt"));
 
 const html = readFileSync(htmlPath, "utf8");
@@ -51,4 +58,4 @@ if (html.includes('property="og:image"') || html.includes('name="twitter:image"'
     assert.ok(/^https:\/\//.test(match[1]), "Social image URLs must be absolute HTTPS URLs");
   }
 }
-console.log("Amplify hosting preflight PASS: HTML, Vite bundles, favicon, robots, metadata, monorepo spec and SPA rewrite.");
+console.log("Amplify brand assets and hosting preflight PASS: HTML, Vite bundles, favicon, robots, metadata, monorepo spec and SPA rewrite.");
