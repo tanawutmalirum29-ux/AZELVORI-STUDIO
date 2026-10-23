@@ -1,6 +1,6 @@
-# Implementation status — Private workspace alpha
+# Implementation status — Studio admin desk alpha
 
-Updated: 2026-10-23 (Asia/Bangkok). This file describes actual code; the master plan describes the intended final service.
+Updated after the studio admin desk increment; see [admin activation](17_ADMIN_ACTIVATION.md). This file describes actual code; the master plan describes the intended final service.
 
 ## Implemented in source
 
@@ -10,8 +10,8 @@ Updated: 2026-10-23 (Asia/Bangkok). This file describes actual code; the master 
 | Brief wizard | Five steps; fields vary for website, app, new game, debugging, maintenance; validation and visible errors | Attachments deferred; no fixed price or delivery promises |
 | Drafts | Type/budget retained seven days; full draft explicitly downloadable as JSON | Private/free-text fields deliberately not persisted automatically; refresh loses them |
 | Submission | 202 only after durable transaction; UUID idempotency; duplicate body conflict; retry; 24KB cap; honeypot; per-IP minute quota | Disabled by default; needs real deployment and reviewed notices |
-| Lead CRM | Founder-only list, cursor pagination, details, allowed status transitions, version conflict detection | Staff grant must be provisioned by authorized operator; no quote/payment execution |
-| Identity | Cognito IaC, hosted code flow + PKCE, explicit email verification, invite-only account provisioning, callback/logout UX | Real AWS login, MFA, email delivery and recovery not yet verified; self-signup off; no automatic token refresh |
+| Lead CRM | Founder-only list/detail, loaded-page search and work queues, private follow-up note/priority/date, versioned transitions, existing project link | Operator helper provisions founder with explicit target and audit; no outbound follow-up notifications or quote/payment execution |
+| Identity | Cognito IaC, hosted code flow + PKCE, explicit email verification, invite-only account provisioning, callback/logout UX | Real AWS login, MFA, email delivery and recovery not yet verified; self-signup off; on-demand refresh implemented with one concurrent request per tab, eight-hour refresh-token lifetime |
 | Invitations | 256-bit token stored as hash, verified-email binding, fixed 72-hour expiry, single-use acceptance, replacement/revocation, one-time link display | Founder shares the project link manually; Cognito sends initial account credentials separately; no automatic email resend |
 | Private projects | Qualified brief → planning workspace, active tenant membership AND project grant, founder/customer views, paged lists, member revocation | One new tenant per project in this increment; no customer organization/role/expiry management UI; creating a workspace does not activate paid work |
 | Milestones | Three weighted steps, founder sets work/review state, customer accepts exact project version, immutable acceptance, progress derives only from acceptance | No deliverable files, owner/deadline editor, contractual scope snapshot or preview build/hash approval |
@@ -19,8 +19,8 @@ Updated: 2026-10-23 (Asia/Bangkok). This file describes actual code; the master 
 | IAM/audit | Strong grant reads, gateway JWT/scope checks, separate append-only audit writes, no Scan/DeleteItem privileges | Does not replace independent cloud authorization review |
 | Portal demo | Overview, milestone-derived progress, device preview, version-pinned sample comments/approval, escaped chat, file/scope examples | Public synthetic content; memory only; no realtime/customer data |
 | AWS source | Cognito, Lambda, HTTP API, two DynamoDB tables, PITR/retention, logs, alarm, optional monthly budget | Synthesized locally; no cloud resources created in this task |
-| Amplify source | Build config, security headers, SPA rewrite config, bundled fonts | Hosting application/domain must be connected and smoke-tested |
-| QA | Contracts, HTTP/domain integration, Dynamo command contracts, infrastructure assertions, browser matrix in CI | Test reports distinguish mocks/local/CI/live AWS |
+| Amplify source | Build config, security headers, SPA rewrite config, bundled fonts | Frontend is observed on the supplied Amplify domain; Cognito/API/intake build settings are still absent there |
+| QA | Contracts, HTTP/domain integration, Dynamo command contracts, infrastructure assertions, browser matrix in CI | 135 tests and 140 browser cases passed; [admin desk QA evidence](18_QA_ADMIN_DESK.md) distinguishes mocks/local/CI/live AWS |
 
 ## Requirement mapping
 
@@ -31,10 +31,10 @@ Updated: 2026-10-23 (Asia/Bangkok). This file describes actual code; the master 
 | P-004 | Baseline validation, idempotency, honeypot, distributed rate counters implemented; live abuse tests pending |
 | P-005 | Transparent alpha notices present; legal identity/contact and reviewed production policies pending |
 | P-006/P-007/P-008 | CMS, full SEO/localization pending; alpha intentionally noindex |
-| I-001/I-004 | Cognito and verified-email client/server flow; deployed auth/MFA/recovery/logout verification and refresh handling pending |
+| I-001/I-004 | Cognito and verified-email client/server flow; on-demand refresh/logout coordination implemented; actual deployed auth/MFA/recovery/refresh verification pending |
 | I-002 | Hashed single-use token, fixed 72h expiry, revoke/replace implemented; adjustable expiry and automatic resend deferred |
 | I-003 | Active tenant + project membership checks and revocation implemented; membership expiry/multiple customer roles deferred |
-| C-001 | Lead list/status implemented; assignments/notes/notifications still pending |
+| C-001 | Lead list/status, private notes, priorities, follow-up dates and queues implemented; staff assignments/outbound notifications pending |
 | C-002 | All five intake service types supported |
 | A-002/A-004 | Backend-gated CRM and mutation audit implemented for current routes |
 | C-005/C-006/C-007 | Planning workspace and simplified work states/milestone acceptance implemented; deposit-triggered activation, full commercial states, deadlines/owners/blockers deferred |
@@ -44,7 +44,7 @@ Updated: 2026-10-23 (Asia/Bangkok). This file describes actual code; the master 
 
 ## Next concrete increment
 
-1. Confirm AWS account/region/domain, operational budget and truthful legal contact. Configure a staging stack with intake closed.
+1. Use the [activation guide](17_ADMIN_ACTIVATION.md) to deploy staging for the supplied Amplify origin, provision the first founder, set frontend variables and redeploy. AWS account/region, budget and truthful legal contact remain operator decisions.
 2. Verify actual hosted login/logout/MFA and staff revocation; test Dynamo transaction/rate semantics in staging.
 3. Run the [private workspace staging checklist](15_PRIVATE_WORKSPACE_PILOT.md) with two synthetic customers; source tests already cover A/B denial, invitation lifecycle and revocation races.
 4. Add private S3 quarantine/download grants and immutable deliverable/preview versions. Expand milestone scope, owners and deadlines.
