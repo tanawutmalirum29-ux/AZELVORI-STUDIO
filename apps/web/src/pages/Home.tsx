@@ -72,6 +72,10 @@ export function Home() {
           </div>
         </div>
         <div className="hero-art">
+          <picture className="brand-hero-backdrop" aria-hidden="true">
+            <source media="(max-width: 600px)" srcSet="/brand/azelvori-home-mobile.svg" />
+            <img src="/brand/azelvori-home-hero.svg" width="1920" height="1080" alt="" fetchPriority="high" />
+          </picture>
           <div className="orbit-line orbit-one" />
           <div className="orbit-line orbit-two" />
           <div className="art-cross cross-one" aria-hidden="true">
@@ -164,6 +168,21 @@ export function Home() {
                 </span>
                 <span className="service-index">0{i + 1}</span>
               </div>
+              <img
+                className="service-card-art"
+                src={`/brand/services/${({
+                  WEBSITE: "service-web-development",
+                  WEB_APP: "service-web-application",
+                  GAME_NEW: "service-game-development",
+                  GAME_BUGFIX: "service-game-debugging",
+                  MAINTENANCE: "service-optimization",
+                } as const)[s.id]}.svg`}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                width="1200"
+                height="900"
+              />
               <span className="eyebrow">{s.en}</span>
               <h3>{s.title}</h3>
               <p>{s.description}</p>
@@ -209,6 +228,15 @@ export function Home() {
             </a>
             <a className="work-item" href="/start?service=GAME_NEW">
               <div className="work-visual game-visual">
+                <img
+                  className="work-game-art"
+                  src="/brand/services/service-game-development.svg"
+                  width="1200"
+                  height="900"
+                  loading="lazy"
+                  alt=""
+                  aria-hidden="true"
+                />
                 <span className="game-overline">AZELVORI / PLAY LAB</span>
                 <div className="game-grid" aria-hidden="true" />
                 <div className="game-artifact" aria-hidden="true">
