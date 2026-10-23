@@ -91,7 +91,9 @@ export function Layout({ children }: { children: ReactNode }) {
         ข้ามไปเนื้อหา
       </a>
       <Header />
-      <main id="main">{children}</main>
+      <main id="main" tabIndex={-1}>
+        {children}
+      </main>
       <Footer />
     </>
   );

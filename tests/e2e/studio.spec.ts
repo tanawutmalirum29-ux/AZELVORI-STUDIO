@@ -15,6 +15,11 @@ test("public pages, links, layout and honest account availability", async ({
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await noOverflow(page);
+  await page.keyboard.press("Tab");
+  const skip = page.getByRole("link", { name: "ข้ามไปเนื้อหา", exact: true });
+  await expect(skip).toBeFocused();
+  await skip.press("Enter");
+  await expect(page.getByRole("main")).toBeFocused();
   if ((page.viewportSize()?.width ?? 1000) <= 760) {
     await page.getByRole("button", { name: "เปิดเมนู" }).click();
     await expect(

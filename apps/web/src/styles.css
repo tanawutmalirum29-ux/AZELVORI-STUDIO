@@ -214,13 +214,17 @@ button {
   top: 8px;
   left: 8px;
   z-index: 100;
-  transform: translateY(-200%);
   background: var(--accent);
   color: #101216;
   padding: 10px 18px;
 }
-.skip-link:focus {
-  transform: translateY(0);
+.skip-link:not(:focus) {
+  clip-path: inset(50%);
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  white-space: nowrap;
 }
 .sr-only {
   position: absolute;

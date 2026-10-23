@@ -31,6 +31,8 @@ Date: 2026-10-23 (Asia/Bangkok). Baseline before implementation: `842b8c6cd66545
 
 - Client receipt handling now requires HTTP 202 and validates the receipt ID, timestamp and status at runtime. Seven transport regression cases reject generic success and malformed responses while preserving server field errors.
 
+- Reviewed saved WebKit screenshots. Replaced offscreen-only skip-link hiding with clipping (avoids a full-page capture artifact after scrolling), and made the main region focusable for keyboard skip navigation. Browser checks now verify Tab → skip link → Enter → main focus.
+
 ## Security and business regression coverage
 
 Five service types, debug reproduction requirement, unsafe reference URLs, forged extra properties, contact validation, stale privacy version, missing rights acknowledgement, size limits, honeypot, origin restriction, UUID requirements, ten retries/one record, concurrent duplicates, different payload/same key, request rate limit, malformed/base64 JSON, trusted gateway context, token scope and token_use, non-staff denial, active grant revocation, version preconditions, allowed CRM transitions, concurrent status updates, unknown private routes, sanitized errors, atomic transaction command shape, conditional collisions vs outages, cursor validation, least-privilege CDK assertions and verified-milestone progress.
