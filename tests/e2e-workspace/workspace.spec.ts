@@ -218,6 +218,10 @@ async function layout(page: Page, info: TestInfo, name: string) {
       () => document.documentElement.scrollWidth - innerWidth,
     ),
   ).toBeLessThanOrEqual(1);
+  for (const item of await page.locator(".wks-milestones > li > div").all()) {
+    // A row may fit the viewport while its text is squeezed into one-word columns.
+    expect((await item.boundingBox())!.width).toBeGreaterThanOrEqual(140);
+  }
   await page.screenshot({
     path: info.outputPath(`${name}.png`),
     fullPage: true,

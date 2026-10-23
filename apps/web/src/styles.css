@@ -4679,10 +4679,15 @@ dd {
     font-size: 34px;
   }
   .wks-milestones > li {
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 30px minmax(0, 1fr);
+    align-items: start;
   }
-  .wks-milestones > li > select {
-    margin-left: 44px;
+  .wks-milestones > li > select,
+  .wks-milestones > li > .button {
+    grid-column: 2;
+    justify-self: start;
+    margin-left: 0;
   }
   .wks-invite-form {
     flex-direction: column;
@@ -4745,9 +4750,6 @@ dd {
   }
   .wks-dialog .wks-inline > button {
     flex: 1;
-  }
-  .wks-milestones > li > .button {
-    margin-left: 44px;
   }
   .wks-invitation {
     padding-block: 40px 65px;
