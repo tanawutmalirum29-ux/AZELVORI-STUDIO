@@ -51,9 +51,13 @@ export function Icon({
 }
 export function Mark() {
   return (
-    <svg width="32" height="32" viewBox="0 0 64 64" aria-hidden="true">
-      <path d="m10 50 22-39 22 39H40l-8-15-8 15z" fill="currentColor" />
-      <path d="m24 50 8-15 8 15z" fill="#7585e8" />
-    </svg>
+    <img
+      src="/brand/azelvori-symbol.svg"
+      width="32"
+      height="32"
+      alt=""
+      aria-hidden="true"
+      decoding="async"
+    />
   );
 }

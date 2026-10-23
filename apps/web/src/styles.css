@@ -4135,3 +4135,98 @@ dd {
     animation: none !important;
   }
 }
+
+/* AZELVORI v1 visual identity — original locally bundled graphics; preserves
+   all existing interactions and responsive layout. */
+.logo > img {
+  width: 32px;
+  height: 32px;
+  display: block;
+  flex: none;
+}
+.brand-hero-backdrop {
+  position: absolute;
+  inset: -10px -6%;
+  z-index: -2;
+  opacity: .55;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: 24px;
+}
+.brand-hero-backdrop img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 68% 48%;
+}
+.service-card-art {
+  display: block;
+  width: 100%;
+  max-height: 185px;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  object-position: center;
+  border: 1px solid #67807955;
+  border-radius: 7px;
+  margin-bottom: 22px;
+  background: #11181d;
+}
+.service-card:hover .service-card-art {
+  border-color: #52a89b;
+}
+.work-game-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: .38;
+  pointer-events: none;
+  z-index: -1;
+}
+.login-story {
+  position: relative;
+  isolation: isolate;
+}
+.login-story::before {
+  content: "";
+  position: absolute;
+  inset: -40px -40px;
+  z-index: -1;
+  background: url("/brand/azelvori-client-portal-cover.svg") center center / cover no-repeat;
+  opacity: .23;
+  pointer-events: none;
+  border-radius: 15px;
+}
+.pricing-band {
+  background-image: linear-gradient(90deg, #11191ee9, #11191edb), url("/brand/azelvori-company-banner.svg");
+  background-position: center;
+  background-size: cover;
+}
+.admin-empty-illustration {
+  display: block;
+  width: min(100%, 240px);
+  height: auto;
+  max-height: 145px;
+  object-fit: cover;
+  margin: 0 auto 18px;
+  border-radius: 7px;
+  opacity: .85;
+}
+@media (max-width: 600px) {
+  .brand-hero-backdrop {
+    inset: -8px 0;
+    opacity: .32;
+  }
+  .service-card-art {
+    max-height: 170px;
+    margin-bottom: 17px;
+  }
+  .login-story::before {
+    inset: -12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .service-card-art { transition: none; }
+}

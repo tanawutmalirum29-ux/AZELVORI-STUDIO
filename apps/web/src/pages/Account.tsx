@@ -252,6 +252,7 @@ export function Admin() {
           {busy && !leads.length && <p role="status">กำลังโหลดบรีฟ…</p>}
           {!busy && !leads.length && (
             <div className="empty-state">
+              <img src="/brand/illustrations/azelvori-empty-project.svg" className="admin-empty-illustration" alt="" loading="lazy" width="1200" height="900" />
               <Icon name="folder" size={35} />
               <h2>ยังไม่มีบรีฟที่แสดงได้</h2>
               <p>ระบบจะแสดงข้อมูลเมื่อเชื่อมต่อและตรวจสิทธิ์ผู้ดูแลสำเร็จ</p>
