@@ -19,6 +19,8 @@ export function auth() {
       response_type: "code",
       scope: "openid email aws.cognito.signin.user.admin azelvori/access",
       automaticSilentRenew: false,
+      silentRequestTimeoutInSeconds: 15,
+      requestTimeoutInSeconds: 15,
       loadUserInfo: false,
       userStore: new WebStorageStateStore({ store: sessionStorage }),
       stateStore: new WebStorageStateStore({ store: sessionStorage }),
@@ -56,8 +58,11 @@ export function finishLogin() {
   return callbackPromise;
 }
 export async function logout() {
+  loggingOut = true;
   sessionStorage.removeItem("azelvori:pending-invite");
   try {
+    // A refresh may persist a new user. Finish it before removing the session.
+    await refreshing?.catch(() => undefined);
     await auth().revokeTokens(["refresh_token"]);
   } finally {
     await auth().removeUser();
@@ -66,9 +71,36 @@ export async function logout() {
     );
   }
 }
+let refreshing: Promise<string> | undefined;
+let loggingOut = false;
 export async function accessToken(): Promise<string> {
+  if (loggingOut) throw new Error("กำลังออกจากระบบ");
   const user = await auth().getUser();
-  if (!user || user.expired)
+  if (loggingOut || !user)
     throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
-  return user.access_token;
+  if ((user.expires_in ?? 0) > 30 && user.access_token)
+    return user.access_token;
+  // Never fall back to iframe sign-in: this app renews only an existing refresh token.
+  if (!user.refresh_token) {
+    if (!user.expired && user.access_token) return user.access_token;
+    throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
+  }
+  if (!refreshing)
+    refreshing = auth()
+      .signinSilent()
+      .then((renewed) => {
+        if (!renewed || renewed.expired || !renewed.access_token)
+          throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
+        return renewed.access_token;
+      })
+      .catch(async () => {
+        await auth().removeUser();
+        throw new Error("ต่ออายุเซสชันไม่สำเร็จ กรุณาเข้าสู่ระบบใหม่");
+      })
+      .finally(() => {
+        refreshing = undefined;
+      });
+  const token = await refreshing;
+  if (loggingOut) throw new Error("กำลังออกจากระบบ");
+  return token;
 }

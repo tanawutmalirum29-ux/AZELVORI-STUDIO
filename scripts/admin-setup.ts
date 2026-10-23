@@ -1,0 +1,321 @@
+/** Operator-only CLI. Never imported by the browser or Lambda. No default AWS target. */
+import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
+import { z } from "zod";
+
+const OptionsSchema = z
+  .object({
+    account: z.string().regex(/^\d{12}$/),
+    region: z.string().regex(/^[a-z]{2}(?:-[a-z]+)+-\d$/),
+    stack: z.enum(["Azelvori-dev", "Azelvori-staging", "Azelvori-prod"]),
+    email: z
+      .email()
+      .max(254)
+      .transform((s) => s.toLowerCase()),
+    profile: z
+      .string()
+      .regex(/^[\w.@-]+$/)
+      .optional(),
+    apply: z.boolean().default(false),
+  })
+  .strict();
+export type SetupOptions = z.infer<typeof OptionsSchema>;
+export function parseOptions(args: string[]): SetupOptions {
+  const values: Record<string, unknown> = {};
+  for (let i = 0; i < args.length; i++) {
+    const key = args[i].replace(/^--/, "");
+    if (!args[i].startsWith("--") || key in values)
+      throw new Error("Invalid or repeated option");
+    if (key === "apply") values[key] = true;
+    else {
+      if (!args[i + 1] || args[i + 1].startsWith("--"))
+        throw new Error(`Missing value for --${key}`);
+      values[key] = args[++i];
+    }
+  }
+  const result = OptionsSchema.safeParse(values);
+  if (!result.success)
+    throw new Error(
+      "Required: --account (12 digits) --region --stack Azelvori-staging --email; optional --profile and --apply",
+    );
+  return result.data;
+}
+type Attribute = { Name?: string; Value?: string };
+type CognitoUser = {
+  Username?: string;
+  Enabled?: boolean;
+  UserStatus?: string;
+  UserAttributes?: Attribute[];
+  Attributes?: Attribute[];
+};
+type AwsResult = Record<string, unknown>;
+export type AwsCall = (
+  service: string,
+  operation: string,
+  input: Record<string, unknown>,
+) => Promise<AwsResult>;
+class AwsFailure extends Error {
+  constructor(public code: string) {
+    super(`AWS operation failed: ${code}`);
+  }
+}
+export function awsCli(options: SetupOptions): AwsCall {
+  return async (service, operation, input) => {
+    try {
+      const result = execFileSync(
+        "aws",
+        [
+          service,
+          operation,
+          "--region",
+          options.region,
+          ...(options.profile ? ["--profile", options.profile] : []),
+          "--output",
+          "json",
+          "--no-cli-pager",
+          "--cli-connect-timeout",
+          "10",
+          "--cli-read-timeout",
+          "30",
+          "--cli-input-json",
+          JSON.stringify(input),
+        ],
+        {
+          encoding: "utf8",
+          timeout: 45000,
+          stdio: ["ignore", "pipe", "pipe"],
+          env: { ...process.env, AWS_CLI_AUTO_PROMPT: "off" },
+        },
+      );
+      return result.trim() ? JSON.parse(result) : {};
+    } catch (e) {
+      const stderr = (e as { stderr?: string }).stderr ?? "";
+      // Print only an allowlisted error code, never provider output or credential details.
+      const code = /\((\w+(?:Exception|Denied|NotFound))\)/.exec(
+        String(stderr),
+      )?.[1];
+      throw new AwsFailure(code ?? "CHECK_AWS_CLI_PROFILE_AND_PERMISSIONS");
+    }
+  };
+}
+function principal(user: CognitoUser, email: string) {
+  const attributes = user.UserAttributes ?? user.Attributes ?? [];
+  const sub = attributes.find((a) => a.Name === "sub")?.Value;
+  const address = attributes.find((a) => a.Name === "email")?.Value;
+  if (
+    !sub ||
+    !z.uuid().safeParse(sub).success ||
+    address?.toLowerCase() !== email ||
+    user.Enabled === false ||
+    !["CONFIRMED", "FORCE_CHANGE_PASSWORD"].includes(user.UserStatus ?? "")
+  )
+    throw new Error(
+      "Cognito principal is disabled, incomplete, or does not exactly match the requested email; no grant written",
+    );
+  return sub;
+}
+type Grant = {
+  data?: {
+    M?: {
+      userId?: { S?: string };
+      role?: { S?: string };
+      active?: { BOOL?: boolean };
+    };
+  };
+};
+function activeGrant(item: Grant | undefined, sub: string) {
+  if (!item) return false;
+  const g = item.data?.M;
+  if (
+    g?.userId?.S === sub &&
+    g.role?.S === "FOUNDER_ADMIN" &&
+    g.active?.BOOL === true
+  )
+    return true;
+  throw new Error(
+    "A different or revoked staff grant already exists; refusing to overwrite or reactivate it",
+  );
+}
+export async function setupAdmin(options: SetupOptions, aws: AwsCall) {
+  const caller = await aws("sts", "get-caller-identity", {});
+  if (caller.Account !== options.account || typeof caller.Arn !== "string")
+    throw new Error("AWS account does not match --account; no changes made");
+  const stackResult = await aws("cloudformation", "describe-stacks", {
+    StackName: options.stack,
+  });
+  const stack = (
+    stackResult.Stacks as
+      | {
+          StackId?: string;
+          StackStatus?: string;
+          Outputs?: { OutputKey: string; OutputValue: string }[];
+        }[]
+      | undefined
+  )?.[0];
+  if (
+    !stack?.StackId?.includes(
+      `:${options.region}:${options.account}:stack/${options.stack}/`,
+    ) ||
+    ![
+      "CREATE_COMPLETE",
+      "UPDATE_COMPLETE",
+      "UPDATE_ROLLBACK_COMPLETE",
+    ].includes(stack.StackStatus ?? "")
+  )
+    throw new Error(
+      "Stack target or deployment status does not match; no changes made",
+    );
+  const outputs = Object.fromEntries(
+    (stack.Outputs ?? []).map((o) => [o.OutputKey, o.OutputValue]),
+  );
+  for (const key of [
+    "UserPoolId",
+    "OperationsTable",
+    "AuditTable",
+    "AppOrigin",
+    "ApiBaseUrl",
+    "CognitoAuthority",
+    "CognitoClientId",
+    "CognitoDomain",
+  ])
+    if (!outputs[key])
+      throw new Error(
+        `Stack output ${key} is missing; deploy the current backend first`,
+      );
+  const origin = new URL(outputs.AppOrigin);
+  if (
+    origin.protocol !== "https:" ||
+    origin.origin !== outputs.AppOrigin ||
+    !outputs.UserPoolId.startsWith(`${options.region}_`)
+  )
+    throw new Error("Stack origin or Cognito region is invalid");
+  const frontend = {
+    VITE_API_BASE_URL: outputs.ApiBaseUrl,
+    VITE_COGNITO_AUTHORITY: outputs.CognitoAuthority,
+    VITE_COGNITO_CLIENT_ID: outputs.CognitoClientId,
+    VITE_COGNITO_DOMAIN: outputs.CognitoDomain,
+    VITE_SITE_URL: outputs.AppOrigin,
+    VITE_PUBLIC_INTAKE_ENABLED: "false",
+  };
+  let user: CognitoUser | undefined;
+  try {
+    user = await aws("cognito-idp", "admin-get-user", {
+      UserPoolId: outputs.UserPoolId,
+      Username: options.email,
+    });
+  } catch (e) {
+    if (
+      !(e instanceof Error) ||
+      !("code" in e) ||
+      e.code !== "UserNotFoundException"
+    )
+      throw e;
+  }
+  let sub = user ? principal(user, options.email) : undefined;
+  const readGrant = async (id: string) => {
+    const result = await aws("dynamodb", "get-item", {
+      TableName: outputs.OperationsTable,
+      Key: { pk: { S: `STAFF#${id}` }, sk: { S: "META" } },
+      ConsistentRead: true,
+    });
+    return activeGrant(result.Item as Grant | undefined, id);
+  };
+  let granted = sub ? await readGrant(sub) : false;
+  const plan = {
+    account: options.account,
+    region: options.region,
+    stack: options.stack,
+    email: options.email,
+    user: user ? "EXISTING" : "CREATE_AND_EMAIL_INVITATION",
+    grant: granted ? "ALREADY_ACTIVE" : "CREATE_FOUNDER_ADMIN",
+    adminUrl: `${outputs.AppOrigin}/admin/login`,
+    frontend,
+  };
+  if (!options.apply) return { mode: "PLAN_ONLY", ...plan };
+  if (!user) {
+    const created = await aws("cognito-idp", "admin-create-user", {
+      UserPoolId: outputs.UserPoolId,
+      Username: options.email,
+      UserAttributes: [{ Name: "email", Value: options.email }],
+      DesiredDeliveryMediums: ["EMAIL"],
+      ForceAliasCreation: false,
+      // Cognito generates and delivers the temporary password. Never expose or set it here.
+    });
+    user = created.User as CognitoUser;
+    if (!user)
+      throw new Error(
+        "Cognito did not return the created account; no staff grant written",
+      );
+    sub = principal(user, options.email);
+    granted = await readGrant(sub);
+  }
+  if (!sub) throw new Error("No verified target principal");
+  if (!granted) {
+    const at = new Date().toISOString(),
+      requestId = randomUUID();
+    await aws("dynamodb", "transact-write-items", {
+      ClientRequestToken: requestId,
+      TransactItems: [
+        {
+          Put: {
+            TableName: outputs.OperationsTable,
+            Item: {
+              pk: { S: `STAFF#${sub}` },
+              sk: { S: "META" },
+              data: {
+                M: {
+                  userId: { S: sub },
+                  role: { S: "FOUNDER_ADMIN" },
+                  active: { BOOL: true },
+                },
+              },
+            },
+            ConditionExpression: "attribute_not_exists(pk)",
+          },
+        },
+        {
+          Put: {
+            TableName: outputs.AuditTable,
+            Item: {
+              pk: { S: `STAFF#${sub}` },
+              sk: { S: `${at}#${requestId}` },
+              action: { S: "staff.founder.provisioned" },
+              actor: { S: caller.Arn },
+              target: { S: sub },
+              at: { S: at },
+              requestId: { S: requestId },
+            },
+            ConditionExpression: "attribute_not_exists(pk)",
+          },
+        },
+      ],
+    });
+    if (!(await readGrant(sub)))
+      throw new Error(
+        "Grant verification did not succeed; inspect the deployment before retrying",
+      );
+  }
+  return { mode: "APPLIED", ...plan, grant: "ACTIVE_VERIFIED" };
+}
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  if (process.argv.includes("--help")) {
+    console.log(
+      "npm run admin:setup -- --account 123456789012 --region ap-southeast-1 --stack Azelvori-staging --email owner@example.com [--profile PROFILE] [--apply]\nDefault: read-only plan. --apply creates the requested founder account (with Cognito email invitation), grant and audit. Never supplies a password. See docs/17_ADMIN_ACTIVATION.md.",
+    );
+  } else {
+    try {
+      const options = parseOptions(process.argv.slice(2));
+      console.log(
+        JSON.stringify(await setupAdmin(options, awsCli(options)), null, 2),
+      );
+    } catch (e) {
+      console.error(e instanceof Error ? e.message : "Setup failed");
+      process.exitCode = 1;
+    }
+  }
+}

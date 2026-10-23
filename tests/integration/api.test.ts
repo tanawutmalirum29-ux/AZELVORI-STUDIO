@@ -221,6 +221,11 @@ describe("HTTP integration / public and admin boundaries", () => {
   });
   it("versioned status update writes an audit and rejects stale data", async () => {
     const r = new MemoryRepository();
+    r.staff.set("founder", {
+      userId: "founder",
+      role: "FOUNDER_ADMIN",
+      active: true,
+    });
     const receipt = await submitLead(r, validLead, randomUUID(), "192.0.2.1");
     await updateLeadStatus(r, receipt.leadId, "ACKNOWLEDGED", 1, "founder");
     expect(r.leads.get(receipt.leadId)?.version).toBe(2);
@@ -252,6 +257,100 @@ describe("HTTP integration / public and admin boundaries", () => {
       ).statusCode,
     ).toBe(428);
   });
+  it("stores private follow-up with versioning, links existing projects and exposes nothing to customers", async () => {
+    const r = new MemoryRepository(),
+      h = createHandler(r, config);
+    r.staff.set("founder", {
+      userId: "founder",
+      role: "FOUNDER_ADMIN",
+      active: true,
+    });
+    const receipt = JSON.parse((await h(event())).body!);
+    const path = `/api/v1/admin/leads/${receipt.leadId}`;
+    vi.spyOn(r, "getLeadProject").mockResolvedValue(
+      "11111111-1111-4111-8111-111111111111",
+    );
+    const followUp = {
+      note: "Private discussion <script>literal</script>",
+      priority: "HIGH",
+      followUpDate: "2026-11-01",
+    };
+    const e = event(path, "PATCH", { followUp }, staffClaims);
+    e.headers["if-match"] = "1";
+    const response = await h(e);
+    expect(response.statusCode).toBe(200);
+    expect(JSON.parse(response.body!)).toMatchObject({
+      version: 2,
+      followUp,
+      status: "NEW",
+    });
+    expect((await h(e)).statusCode).toBe(409);
+    const detail = JSON.parse(
+      (await h(event(path, "GET", {}, staffClaims))).body!,
+    );
+    expect(detail.projectId).toBe("11111111-1111-4111-8111-111111111111");
+    expect(detail.lead.followUp.note).toBe(followUp.note);
+    const forbidden = await h(
+      event(path, "GET", {}, { ...staffClaims, sub: "customer" }),
+    );
+    expect(forbidden.statusCode).toBe(403);
+    expect(forbidden.body).not.toContain("Private discussion");
+    expect(JSON.stringify(r.audit)).not.toContain(followUp.note);
+  });
+  it.each([
+    { note: "x".repeat(5001), priority: "HIGH", followUpDate: "" },
+    { note: "hello", priority: "HIGH", followUpDate: "2026-02-30" },
+    { note: "hello", priority: "ADMIN", followUpDate: "" },
+    {
+      note: "hello",
+      priority: "NORMAL",
+      followUpDate: "",
+      updatedAt: "forged",
+    },
+  ])("rejects malformed follow-up without writes", async (followUp) => {
+    const r = new MemoryRepository(),
+      h = createHandler(r, config);
+    r.staff.set("founder", {
+      userId: "founder",
+      role: "FOUNDER_ADMIN",
+      active: true,
+    });
+    const receipt = JSON.parse((await h(event())).body!);
+    const e = event(
+      `/api/v1/admin/leads/${receipt.leadId}`,
+      "PATCH",
+      { followUp },
+      staffClaims,
+    );
+    e.headers["if-match"] = "1";
+    expect((await h(e)).statusCode).toBe(422);
+    expect(r.audit).toHaveLength(1);
+  });
+  it("does not write follow-up when staff is revoked between authorization and commit", async () => {
+    const r = new MemoryRepository(),
+      h = createHandler(r, config);
+    r.staff.set("founder", {
+      userId: "founder",
+      role: "FOUNDER_ADMIN",
+      active: true,
+    });
+    const receipt = JSON.parse((await h(event())).body!);
+    const save = r.saveFollowUp.bind(r);
+    vi.spyOn(r, "saveFollowUp").mockImplementation(async (...args) => {
+      r.staff.get("founder")!.active = false;
+      return save(...args);
+    });
+    const e = event(
+      `/api/v1/admin/leads/${receipt.leadId}`,
+      "PATCH",
+      { followUp: { note: "private", priority: "NORMAL", followUpDate: "" } },
+      staffClaims,
+    );
+    e.headers["if-match"] = "1";
+    expect((await h(e)).statusCode).toBe(409);
+    expect(r.audit).toHaveLength(1);
+    expect(r.leads.get(receipt.leadId)?.followUp).toBeUndefined();
+  });
   it("rejects skipping the commercial workflow", async () => {
     const r = new MemoryRepository();
     const receipt = await submitLead(r, validLead, randomUUID(), "192.0.2.1");
@@ -261,6 +360,11 @@ describe("HTTP integration / public and admin boundaries", () => {
   });
   it("only one concurrent update succeeds", async () => {
     const r = new MemoryRepository();
+    r.staff.set("founder", {
+      userId: "founder",
+      role: "FOUNDER_ADMIN",
+      active: true,
+    });
     const receipt = await submitLead(r, validLead, randomUUID(), "192.0.2.1");
     const result = await Promise.allSettled([
       updateLeadStatus(r, receipt.leadId, "ACKNOWLEDGED", 1, "founder"),

@@ -179,11 +179,87 @@ export class DynamoRepository implements Repository {
     const item = await this.get(`LEAD#${id}`);
     return item?.data as LeadRecord | undefined;
   }
+  async getLeadProject(id: string) {
+    const item = await this.get(`LEADPROJECT#${id}`);
+    return item?.data?.projectId as string | undefined;
+  }
+  private staffCheck(actor: string) {
+    return {
+      ConditionCheck: {
+        TableName: this.table,
+        Key: { pk: `STAFF#${actor}`, sk: "META" },
+        ConditionExpression: "#data.#active = :active AND #data.#role = :role",
+        ExpressionAttributeNames: {
+          "#data": "data",
+          "#active": "active",
+          "#role": "role",
+        },
+        ExpressionAttributeValues: {
+          ":active": true,
+          ":role": "FOUNDER_ADMIN",
+        },
+      },
+    };
+  }
+  async saveFollowUp(
+    lead: LeadRecord,
+    followUp: NonNullable<LeadRecord["followUp"]>,
+    actor: string,
+  ) {
+    try {
+      await this.client.send(
+        new TransactWriteCommand({
+          TransactItems: [
+            this.staffCheck(actor),
+            {
+              Update: {
+                TableName: this.table,
+                Key: { pk: `LEAD#${lead.leadId}`, sk: "META" },
+                UpdateExpression:
+                  "SET #data.#followUp = :followUp, #data.#version = :next",
+                ConditionExpression: "#data.#version = :version",
+                ExpressionAttributeNames: {
+                  "#data": "data",
+                  "#followUp": "followUp",
+                  "#version": "version",
+                },
+                ExpressionAttributeValues: {
+                  ":followUp": followUp,
+                  ":version": lead.version,
+                  ":next": lead.version + 1,
+                },
+              },
+            },
+            {
+              Put: {
+                TableName: this.auditTable,
+                Item: {
+                  pk: `LEAD#${lead.leadId}`,
+                  sk: `${followUp.updatedAt}#${randomUUID()}`,
+                  action: "lead.followup.changed",
+                  target: lead.leadId,
+                  actor,
+                  at: followUp.updatedAt,
+                  version: lead.version + 1,
+                },
+                ConditionExpression: "attribute_not_exists(pk)",
+              },
+            },
+          ],
+        }),
+      );
+      return true;
+    } catch (e) {
+      if (conditionalFailure(e)) return false;
+      throw e;
+    }
+  }
   async changeStatus(lead: LeadRecord, status: LeadStatus, actor: string) {
     try {
       await this.client.send(
         new TransactWriteCommand({
           TransactItems: [
+            this.staffCheck(actor),
             {
               Update: {
                 TableName: this.table,

@@ -16,7 +16,13 @@ const Callback = lazy(() =>
   import("./pages/Account").then((m) => ({ default: m.Callback })),
 );
 const Admin = lazy(() =>
-  import("./pages/Account").then((m) => ({ default: m.Admin })),
+  import("./pages/Admin").then((m) => ({ default: m.Admin })),
+);
+const AdminLogin = lazy(() =>
+  import("./components/AdminEntry").then((m) => ({ default: m.AdminEntry })),
+);
+const AdminSetup = lazy(() =>
+  import("./pages/AdminSetup").then((m) => ({ default: m.AdminSetup })),
 );
 const CustomerAccount = lazy(() =>
   import("./pages/Workspace").then((m) => ({ default: m.Workspace })),
@@ -34,7 +40,9 @@ const titles: Record<string, string> = {
   "/demo": "พอร์ทัลตัวอย่าง",
   "/login": "พื้นที่ลูกค้า",
   "/app": "พื้นที่ลูกค้า",
-  "/admin": "จัดการบรีฟ",
+  "/admin": "บรีฟและคิวงาน",
+  "/admin/login": "เข้าสู่ระบบผู้ดูแล",
+  "/admin/setup": "เปิดใช้งานแอดมิน",
   "/admin/projects": "จัดการโปรเจกต์",
   "/invite": "คำเชิญเข้าโปรเจกต์",
   "/auth/callback": "ยืนยันบัญชี",
@@ -50,7 +58,10 @@ function Route() {
   if (path === "/login") return <Login />;
   if (path === "/auth/callback") return <Callback />;
   if (path === "/admin") return <Admin />;
-  if (path === "/app" || path === "/admin/projects") return <CustomerAccount />;
+  if (path === "/admin/login") return <AdminLogin />;
+  if (path === "/admin/setup") return <AdminSetup />;
+  if (path === "/app" || path === "/admin/projects")
+    return <CustomerAccount requireAdmin={path === "/admin/projects"} />;
   if (path === "/invite") return <Invite />;
   if (["/privacy", "/terms", "/cookies", "/refund-policy"].includes(path))
     return <Legal path={path} />;

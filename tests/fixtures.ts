@@ -69,9 +69,39 @@ export class MemoryRepository implements Repository {
     const lead = this.leads.get(id);
     return lead ? structuredClone(lead) : undefined;
   }
+  async getLeadProject(_id: string): Promise<string | undefined> {
+    return undefined;
+  }
+  async saveFollowUp(
+    lead: LeadRecord,
+    followUp: NonNullable<LeadRecord["followUp"]>,
+    actor: string,
+  ) {
+    const current = this.leads.get(lead.leadId);
+    const staff = this.staff.get(actor);
+    if (
+      current?.version !== lead.version ||
+      !staff?.active ||
+      staff.role !== "FOUNDER_ADMIN"
+    )
+      return false;
+    this.leads.set(lead.leadId, {
+      ...current,
+      followUp,
+      version: current.version + 1,
+    });
+    this.audit.push({ action: "lead.followup.changed", actor });
+    return true;
+  }
   async changeStatus(lead: LeadRecord, status: LeadStatus, actor: string) {
     const current = this.leads.get(lead.leadId);
-    if (current?.version !== lead.version) return false;
+    const staff = this.staff.get(actor);
+    if (
+      current?.version !== lead.version ||
+      !staff?.active ||
+      staff.role !== "FOUNDER_ADMIN"
+    )
+      return false;
     this.leads.set(lead.leadId, {
       ...current,
       status,

@@ -38,7 +38,8 @@ Each browser suite runs ten browser/viewport projects: Chromium + WebKit at 320Ã
 | GET `/health` | Public | Basic process health only; does not claim dependency health |
 | POST `/api/v1/leads` | Public, allowlisted Origin, intake flag | JSON `LeadSchema`, UUID `Idempotency-Key`, 202 receipt after transaction |
 | GET `/api/v1/admin/leads?cursor=...` | Cognito access token + `azelvori/access` + active founder DB grant | 25 records, opaque cursor; no global scan |
-| PATCH `/api/v1/admin/leads/{id}` | Same founder checks | `{ "status": "ACKNOWLEDGED" }`, integer `If-Match` version; optimistic transaction + audit |
+| GET `/api/v1/admin/leads/{id}` | Same founder checks | Strongly consistent lead detail and existing project link |
+| PATCH `/api/v1/admin/leads/{id}` | Same founder checks | `{ "status": "ACKNOWLEDGED" }` or `{followUp:{note,priority,followUpDate}}`, integer `If-Match`; lead version + active founder check + audit in one transaction |
 
 Errors: 400 invalid JSON/key/cursor; 401 missing trusted claims; 403 permission/origin; 404 unknown route/resource; 409 version/state/idempotency conflict; 410 expired/replaced invitation; 413 body too large; 415 wrong media type; 422 validation; 428 missing version; 429 quota (`Retry-After: 60`); 503 intake closed/retry; 500 sanitized internal failure. Error body is `{error:{code,message,fields?},requestId}`. All API responses are `no-store`. Project, invitation, membership and messaging endpoints are documented in [Private workspace API](15_PRIVATE_WORKSPACE_PILOT.md). Billing and preview endpoints remain unimplemented and return no synthetic data.
 
@@ -82,7 +83,7 @@ The callback is exactly `APP_ORIGIN/auth/callback`; logout returns to `APP_ORIGI
 }
 ```
 
-Provision only the intended founder using a restricted operator role; this is a sample schema, not an automatic privilege-grant script. Record operator, request and time in the administrative provisioning record. Setting `active:false` denies subsequent CRM requests even while a JWT is still unexpired. The application has no role-management endpoint and a browser cannot grant itself staff rights. Verify MFA enrollment and password recovery before pilot.
+Use the read-only-first `npm run admin:setup` helper described in [Admin activation](17_ADMIN_ACTIVATION.md) to provision the intended founder using a restricted operator role; the JSON above is a schema example; the operator helper requires an explicit account, region, stack, email and `--apply` before writing a grant with audit. Record operator, request and time in the administrative provisioning record. Setting `active:false` denies subsequent CRM requests even while a JWT is still unexpired. The application has no role-management endpoint and a browser cannot grant itself staff rights. Verify MFA enrollment and password recovery before pilot.
 
 ## Amplify hosting
 
@@ -98,7 +99,7 @@ Enabling live intake requires accurate reviewed identity/contact/privacy notices
 ## Limitations and safe operation
 
 - No SES brief acknowledgement emails yet: brief submission only claims a persisted receipt. The workspace invitation flow separately invokes Cognito account email delivery for new accounts; existing users receive no automatic resend.
-- Browser sessions use per-tab sessionStorage; no persistent localStorage tokens. Access tokens expire in five minutes. Silent refresh and full account lifecycle remain future work. Test logout/revocation against Cognito; offline JWT validation can honor an issued token until expiration, while DB grant revocation applies on every staff request.
+- Browser sessions use per-tab sessionStorage; no persistent localStorage tokens. Access tokens expire in five minutes. The browser now refreshes on demand using the existing refresh token (one concurrent refresh per tab); the pool refresh-token lifetime remains eight hours. Full account lifecycle and live Cognito verification remain pilot gates. Test logout/revocation against Cognito; offline JWT validation can honor an issued token until expiration, while DB grant revocation applies on every staff request.
 - Lead metadata retention is not automated in alpha. Idempotency receipts have seven-day TTL; rate records have short TTL. TTL cleanup is asynchronous. Publish/review retention and erasure operations before real PII intake.
 - Idempotency memory/model and Dynamo command assertions do not prove actual AWS transaction behavior; staging tests are mandatory.
 - CRM `WON` is a manually recorded sales status, not evidence of deposit payment or permission to activate a paid project.

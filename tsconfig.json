@@ -15,5 +15,13 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["apps", "packages", "services", "infrastructure", "tests", "*.ts"]
+  "include": [
+    "apps",
+    "packages",
+    "services",
+    "infrastructure",
+    "scripts",
+    "tests",
+    "*.ts"
+  ]
 }

@@ -1,4 +1,11 @@
-import { LeadReceiptSchema } from "@azelvori/contracts";
+import {
+  LeadReceiptSchema,
+  LeadPageSchema,
+  LeadRecordSchema,
+  LeadDetailSchema,
+  type LeadFollowUp,
+} from "@azelvori/contracts";
+import type { z } from "zod";
 import type {
   ApiErrorBody,
   LeadInput,
@@ -73,24 +80,46 @@ export async function sendLead(data: LeadInput, key: string) {
     );
   return receipt.data;
 }
+async function validated<T>(schema: z.ZodType<T>, request: Promise<unknown>) {
+  const parsed = schema.safeParse(await request);
+  if (!parsed.success)
+    throw new ApiError(
+      502,
+      "INVALID_RESPONSE",
+      "ระบบส่งข้อมูลไม่ครบ กรุณาโหลดใหม่",
+    );
+  return parsed.data;
+}
 export const getLeads = (token: string, cursor?: string) =>
-  api<{ items: LeadRecord[]; nextCursor?: string }>(
-    `/api/v1/admin/leads${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
-    { headers: { Authorization: `Bearer ${token}` } },
+  validated(
+    LeadPageSchema,
+    api<unknown>(
+      `/api/v1/admin/leads${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    ),
+  );
+export const getLead = (token: string, id: string) =>
+  validated(
+    LeadDetailSchema,
+    api<unknown>(`/api/v1/admin/leads/${encodeURIComponent(id)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
   );
 export const patchLead = (
   token: string,
   lead: LeadRecord,
-  status: LeadStatus,
+  change: LeadStatus | LeadFollowUp,
 ) =>
-  api<{ version: number; status: LeadStatus }>(
-    `/api/v1/admin/leads/${encodeURIComponent(lead.leadId)}`,
-    {
+  validated(
+    LeadRecordSchema,
+    api<unknown>(`/api/v1/admin/leads/${encodeURIComponent(lead.leadId)}`, {
       method: "PATCH",
       headers: {
         Authorization: `Bearer ${token}`,
         "If-Match": String(lead.version),
       },
-      body: JSON.stringify({ status }),
-    },
+      body: JSON.stringify(
+        typeof change === "string" ? { status: change } : { followUp: change },
+      ),
+    }),
   );

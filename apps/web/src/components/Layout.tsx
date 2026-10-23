@@ -77,6 +77,7 @@ export function Footer() {
             <a href="/privacy">ความเป็นส่วนตัว</a>
             <a href="/terms">เงื่อนไข</a>
             <a href="/cookies">การจัดเก็บข้อมูล</a>
+            <a href="/admin/login">สำหรับผู้ดูแล</a>
           </div>
           <span className="alpha-label">DEVELOPMENT PREVIEW</span>
         </div>

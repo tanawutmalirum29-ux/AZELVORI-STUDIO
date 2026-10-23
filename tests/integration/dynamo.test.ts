@@ -36,13 +36,11 @@ describe("Dynamo persistence contract", () => {
     );
   });
   it("does not mistake transient AWS failures for duplicate success", async () => {
-    const send = vi
-      .fn()
-      .mockRejectedValue(
-        Object.assign(new Error("throttled"), {
-          name: "ProvisionedThroughputExceededException",
-        }),
-      );
+    const send = vi.fn().mockRejectedValue(
+      Object.assign(new Error("throttled"), {
+        name: "ProvisionedThroughputExceededException",
+      }),
+    );
     const repo = new DynamoRepository("data", "audit", {
       send,
     } as unknown as DynamoDBDocumentClient);
@@ -55,14 +53,12 @@ describe("Dynamo persistence contract", () => {
     ).rejects.toThrow("throttled");
   });
   it("recognizes a conditional transaction collision", async () => {
-    const send = vi
-      .fn()
-      .mockRejectedValue(
-        Object.assign(new Error("collision"), {
-          name: "TransactionCanceledException",
-          CancellationReasons: [{ Code: "ConditionalCheckFailed" }],
-        }),
-      );
+    const send = vi.fn().mockRejectedValue(
+      Object.assign(new Error("collision"), {
+        name: "TransactionCanceledException",
+        CancellationReasons: [{ Code: "ConditionalCheckFailed" }],
+      }),
+    );
     const repo = new DynamoRepository("data", "audit", {
       send,
     } as unknown as DynamoDBDocumentClient);
@@ -83,6 +79,38 @@ describe("Dynamo persistence contract", () => {
       Key: { pk: "STAFF#actor", sk: "META" },
       ConsistentRead: true,
     });
+  });
+  it("commits private notes only with a current founder grant and lead version, without notes in audit", async () => {
+    const send = vi.fn().mockResolvedValue({});
+    const repo = new DynamoRepository("data", "audit", {
+      send,
+    } as unknown as DynamoDBDocumentClient);
+    await repo.saveFollowUp(
+      lead,
+      {
+        note: "private-note",
+        priority: "HIGH",
+        followUpDate: "2026-11-01",
+        updatedAt: lead.createdAt,
+      },
+      "actor",
+    );
+    const tx = send.mock.calls[0][0].input.TransactItems;
+    expect(tx[0].ConditionCheck).toMatchObject({
+      Key: { pk: "STAFF#actor", sk: "META" },
+      ExpressionAttributeValues: { ":active": true, ":role": "FOUNDER_ADMIN" },
+    });
+    expect(tx[1].Update).toMatchObject({
+      ConditionExpression: "#data.#version = :version",
+      ExpressionAttributeValues: { ":version": 1, ":next": 2 },
+    });
+    expect(tx[2].Put.Item.action).toBe("lead.followup.changed");
+    expect(JSON.stringify(tx[2])).not.toContain("private-note");
+    send.mockClear();
+    await repo.changeStatus(lead, "ACKNOWLEDGED", "actor");
+    expect(send.mock.calls[0][0].input.TransactItems[0].ConditionCheck).toEqual(
+      tx[0].ConditionCheck,
+    );
   });
   it("rejects a forged cursor before accessing the database", async () => {
     const send = vi.fn();

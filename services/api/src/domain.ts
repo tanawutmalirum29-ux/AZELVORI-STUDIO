@@ -5,6 +5,7 @@ import {
   type LeadRecord,
   type LeadReceipt,
   type LeadStatus,
+  type LeadFollowUp,
 } from "@azelvori/contracts";
 
 export class HttpError extends Error {
@@ -36,6 +37,12 @@ export interface Repository {
   getStaff(userId: string): Promise<StaffGrant | undefined>;
   listLeads(cursor?: string): Promise<LeadPage>;
   getLead(leadId: string): Promise<LeadRecord | undefined>;
+  getLeadProject(leadId: string): Promise<string | undefined>;
+  saveFollowUp(
+    lead: LeadRecord,
+    followUp: NonNullable<LeadRecord["followUp"]>,
+    actor: string,
+  ): Promise<boolean>;
   changeStatus(
     lead: LeadRecord,
     status: LeadStatus,
@@ -156,5 +163,31 @@ export async function updateLeadStatus(
       "STALE_VERSION",
       "มีผู้แก้ไขพร้อมกัน กรุณาโหลดข้อมูลล่าสุด",
     );
-  return { leadId, status, version: version + 1 };
+  return { ...lead, status, version: version + 1 };
+}
+
+export async function updateLeadFollowUp(
+  repo: Repository,
+  leadId: string,
+  followUp: LeadFollowUp,
+  version: number,
+  actor: string,
+  now = new Date(),
+) {
+  const lead = await repo.getLead(leadId);
+  if (!lead) throw new HttpError(404, "NOT_FOUND", "ไม่พบบรีฟ");
+  if (lead.version !== version)
+    throw new HttpError(
+      409,
+      "STALE_VERSION",
+      "บรีฟถูกเปลี่ยนแล้ว กรุณาโหลดข้อมูลล่าสุดก่อนบันทึก",
+    );
+  const saved = { ...followUp, updatedAt: now.toISOString() };
+  if (!(await repo.saveFollowUp(lead, saved, actor)))
+    throw new HttpError(
+      409,
+      "STALE_VERSION",
+      "มีผู้แก้ไขพร้อมกัน กรุณาโหลดข้อมูลล่าสุดก่อนบันทึก",
+    );
+  return { ...lead, followUp: saved, version: version + 1 };
 }

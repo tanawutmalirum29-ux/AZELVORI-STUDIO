@@ -1,4 +1,5 @@
 import { pendingInvite, inviteStorage } from "../lib/invitation";
+import { AdminEntry } from "../components/AdminEntry";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   PROJECT_STATES,
@@ -151,7 +152,13 @@ function EmailVerification({
     </section>
   );
 }
-export function ProjectCreateCard({ lead }: { lead: LeadRecord }) {
+export function ProjectCreateCard({
+  lead,
+  disabled = false,
+}: {
+  lead: LeadRecord;
+  disabled?: boolean;
+}) {
   const [title, setTitle] = useState(lead.title),
     [summary, setSummary] = useState(lead.description),
     [busy, setBusy] = useState(false),
@@ -160,7 +167,7 @@ export function ProjectCreateCard({ lead }: { lead: LeadRecord }) {
     lock = useRef(false);
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (lock.current) return;
+    if (lock.current || disabled) return;
     const data = { leadId: lead.leadId, title, summary },
       parsed = ProjectCreateSchema.safeParse(data);
     if (!parsed.success) {
@@ -216,17 +223,26 @@ export function ProjectCreateCard({ lead }: { lead: LeadRecord }) {
         การสร้างโปรเจกต์ไม่ยืนยันการชำระเงินหรือแทนข้อตกลงราคา
       </p>
       {error && <Notice kind="error">{error}</Notice>}
-      <button className="button" disabled={busy}>
+      <button className="button" disabled={busy || disabled}>
         {busy ? "กำลังสร้าง…" : "สร้างโปรเจกต์ส่วนตัว"}
         <Icon name="arrow" />
       </button>
     </form>
   );
 }
-export function Workspace() {
+export function Workspace({
+  requireAdmin = false,
+}: {
+  requireAdmin?: boolean;
+}) {
   const session = useIdentity();
   if (!session.identity)
-    return <AccountRequired loading={session.loading} error={session.error} />;
+    return requireAdmin ? (
+      <AdminEntry loading={session.loading} reason={session.error} />
+    ) : (
+      <AccountRequired loading={session.loading} error={session.error} />
+    );
+  if (requireAdmin && !session.identity.staff) return <AdminEntry denied />;
   return (
     <WorkspaceContent
       identity={session.identity}

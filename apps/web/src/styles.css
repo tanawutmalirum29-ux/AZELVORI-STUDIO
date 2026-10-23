@@ -4767,3 +4767,243 @@ dd {
     gap: 8px;
   }
 }
+
+/* The studio desk shares the customer portal's type and color system. */
+.admin-entry .login-story h1 {
+  font-size: clamp(30px, 4vw, 52px);
+}
+.admin-entry .login-story p {
+  max-width: 44ch;
+}
+.admin-setup {
+  padding-block: 64px;
+}
+.desk-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 28px;
+}
+.desk-nav a {
+  padding: 12px 17px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font-size: 13px;
+}
+.desk-nav a[aria-current="page"] {
+  background: #25392f;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.desk-account {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.desk-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.desk-stats button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 22px;
+  border: 1px solid #3c4b55;
+  background: #17212b;
+  border-radius: 10px;
+  text-align: left;
+}
+.desk-stats button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: #20362e;
+}
+.desk-stats span {
+  font-size: 12px;
+  color: #bac9d3;
+}
+.desk-stats strong {
+  font-size: 32px;
+  line-height: 1;
+}
+.desk-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px auto;
+  align-items: end;
+  gap: 16px;
+}
+.desk-filters .field {
+  margin: 0;
+  min-width: 0;
+}
+.desk-filters .button {
+  min-height: 48px;
+}
+.desk-follow-up {
+  padding: 22px;
+  margin-block: 28px;
+  border: 1px solid #40534e;
+  border-radius: 10px;
+  background: #172a25;
+}
+.desk-follow-up h3 {
+  margin-top: 0;
+}
+.desk-follow-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.desk-follow-up .field {
+  min-width: 0;
+}
+.desk-follow-up textarea {
+  resize: vertical;
+}
+.desk-priority {
+  display: inline-block;
+  margin: 8px 0 0 8px;
+  font-size: 10px;
+  color: #f2ce8a;
+}
+.lead-card .desk-due {
+  color: #f2ce8a;
+}
+.lead-detail dd {
+  overflow-wrap: anywhere;
+}
+.setup-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.setup-panel {
+  min-width: 0;
+  border: 1px solid #3c4b55;
+  border-radius: 12px;
+  padding: 30px;
+  background: #17212b;
+}
+.setup-panel h2 {
+  margin-top: 0;
+  font-size: 22px;
+}
+.setup-panel p {
+  color: #bac9d3;
+  line-height: 1.8;
+  font-size: 13px;
+}
+.setup-panel .text-link {
+  display: block;
+  margin-top: 22px;
+  font-size: 12px;
+}
+.setup-checks {
+  list-style: none;
+  padding: 0;
+  margin-block: 26px;
+}
+.setup-checks li {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  justify-content: space-between;
+  padding: 18px 0;
+  border-bottom: 1px solid #3c4b55;
+}
+.setup-checks strong {
+  font-size: 14px;
+}
+.setup-checks p {
+  margin-bottom: 0;
+}
+.setup-checks .badge {
+  flex-shrink: 0;
+}
+.setup-checks .ready {
+  color: var(--accent);
+}
+.setup-steps {
+  padding-left: 24px;
+}
+.setup-steps li {
+  padding: 6px 0 10px 6px;
+}
+.setup-steps li::marker {
+  color: var(--accent);
+}
+.setup-technical {
+  margin-top: 24px;
+}
+.setup-technical summary {
+  cursor: pointer;
+  padding: 4px 0;
+  font-size: 14px;
+}
+.setup-technical code {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.setup-technical li {
+  margin-block: 10px;
+}
+@media (max-width: 900px) {
+  .desk-filters {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .desk-filters > .field:first-child {
+    grid-column: 1 / -1;
+  }
+  .setup-grid {
+    grid-template-columns: 1fr;
+  }
+  .admin-heading {
+    flex-wrap: wrap;
+  }
+  .desk-account {
+    align-items: flex-start;
+    margin-bottom: 26px;
+  }
+}
+@media (max-width: 560px) {
+  .admin-setup {
+    padding-block: 40px;
+  }
+  .desk-stats {
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .desk-stats button {
+    padding: 18px;
+  }
+  .desk-stats strong {
+    font-size: 28px;
+  }
+  .desk-filters,
+  .desk-follow-fields {
+    grid-template-columns: 1fr;
+  }
+  .desk-follow-up {
+    padding: 16px;
+  }
+  .desk-follow-up .status-actions {
+    flex-direction: column;
+  }
+  .setup-panel {
+    padding: 20px;
+  }
+  .setup-checks li {
+    flex-direction: column;
+  }
+  .desk-nav a {
+    font-size: 12px;
+    padding: 10px 12px;
+  }
+}

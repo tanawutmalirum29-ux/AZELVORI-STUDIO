@@ -56,6 +56,8 @@ test("public pages, links, layout and honest account availability", async ({
     "/invite",
     "/admin/projects",
     "/admin",
+    "/admin/login",
+    "/admin/setup",
     "/not-found",
   ]) {
     await page.goto(path);
@@ -67,6 +69,33 @@ test("public pages, links, layout and honest account availability", async ({
     page.getByRole("button", { name: "เข้าสู่พื้นที่ลูกค้า" }),
   ).toBeDisabled();
   expect(errors).toEqual([]);
+});
+test("admin entry explains setup and keeps unconfigured login disabled", async ({
+  page,
+}, info) => {
+  await page.goto("/admin/login");
+  await expect(
+    page.getByRole("button", { name: "เข้าสู่ระบบผู้ดูแล", exact: true }),
+  ).toBeDisabled();
+  await page.getByRole("link", { name: "วิธีเปิดหน้าแอดมินครั้งแรก" }).click();
+  await expect(
+    page.getByRole("heading", { name: "เปิดใช้งานแอดมินครั้งแรก" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "ทดสอบการตอบกลับ API" }),
+  ).toBeDisabled();
+  await noOverflow(page);
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await page.screenshot({
+    path: info.outputPath("admin-setup.png"),
+    fullPage: true,
+  });
 });
 test("website wizard validates, exports locally and never pretends to submit", async ({
   page,

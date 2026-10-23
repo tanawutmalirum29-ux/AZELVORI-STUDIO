@@ -176,12 +176,32 @@ export const LEAD_STATUSES = [
   "LOST",
 ] as const;
 export type LeadStatus = (typeof LEAD_STATUSES)[number];
-export type LeadRecord = Lead & {
-  leadId: string;
-  createdAt: string;
-  status: LeadStatus;
-  version: number;
-};
+export const LeadFollowUpSchema = z
+  .object({
+    note: z.string().trim().max(5000),
+    priority: z.enum(["NORMAL", "HIGH"]),
+    followUpDate: z.union([z.literal(""), z.iso.date()]),
+  })
+  .strict();
+export type LeadFollowUp = z.infer<typeof LeadFollowUpSchema>;
+export const LeadRecordSchema = LeadFields.extend({
+  leadId: z.string().regex(/^LEAD-\d{4}-[A-F0-9]{16}$/),
+  createdAt: z.iso.datetime(),
+  status: z.enum(LEAD_STATUSES),
+  version: z.number().int().positive().max(999999999),
+  followUp: LeadFollowUpSchema.extend({
+    updatedAt: z.iso.datetime(),
+  }).optional(),
+}).strip();
+export type LeadRecord = z.infer<typeof LeadRecordSchema>;
+export const LeadPageSchema = z.object({
+  items: z.array(LeadRecordSchema),
+  nextCursor: z.string().max(1500).optional(),
+});
+export const LeadDetailSchema = z.object({
+  lead: LeadRecordSchema,
+  projectId: z.string().uuid().optional(),
+});
 export const LeadReceiptSchema = z
   .object({
     leadId: z.string().regex(/^LEAD-\d{4}-[A-F0-9]{16}$/),
@@ -193,6 +213,10 @@ export type LeadReceipt = z.output<typeof LeadReceiptSchema>;
 export const LeadStatusSchema = z
   .object({ status: z.enum(LEAD_STATUSES) })
   .strict();
+export const LeadUpdateSchema = z.union([
+  LeadStatusSchema,
+  z.object({ followUp: LeadFollowUpSchema }).strict(),
+]);
 export const LEAD_TRANSITIONS: Record<LeadStatus, readonly LeadStatus[]> = {
   NEW: ["ACKNOWLEDGED", "LOST"],
   ACKNOWLEDGED: ["DISCOVERY", "LOST"],

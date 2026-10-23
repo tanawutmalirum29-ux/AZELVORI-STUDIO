@@ -4,6 +4,7 @@ import type {
   StudioProject,
   ProjectMessage,
   ProjectMember,
+  LeadRecord,
 } from "@azelvori/contracts";
 import { validLead } from "../fixtures";
 
@@ -96,6 +97,16 @@ async function setup(page: Page, staff = false, verified = true) {
     invitedEmail: "",
     inviteRevoked: false,
     created: false,
+    lead: {
+      ...validLead,
+      leadId: "LEAD-2026-0123456789ABCDEF",
+      status: "QUALIFIED",
+      version: 1,
+      createdAt: date,
+    } as LeadRecord,
+    crmUnavailable: false,
+    crmForbidden: false,
+    adminRequests: [] as string[],
   };
   await page.route("https://api.example.test/**", async (route) => {
     const request = route.request(),
@@ -130,19 +141,33 @@ async function setup(page: Page, staff = false, verified = true) {
       state.acceptedInvite = true;
       return send(state.project);
     }
-    if (path === "/admin/leads")
-      return send({
-        items: [
-          {
-            ...validLead,
-            leadId: state.project.leadId,
-            status: "QUALIFIED",
-            version: 1,
-            createdAt: date,
-            updatedAt: date,
-          },
-        ],
-      });
+    if (path.startsWith("/admin/leads")) {
+      state.adminRequests.push(`${method} ${path}`);
+      if (state.crmForbidden) return fail(403, "สิทธิ์ผู้ดูแลถูกถอน");
+      if (path === "/admin/leads") return send({ items: [state.lead] });
+      if (method === "GET")
+        return send({
+          lead: state.lead,
+          ...(state.created ? { projectId } : {}),
+        });
+      if (method === "PATCH") {
+        if (state.crmUnavailable) {
+          state.crmUnavailable = false;
+          return fail(503, "ลองใหม่อีกครั้ง ร่างยังไม่ถูกบันทึก");
+        }
+        if (request.headers()["if-match"] !== String(state.lead.version))
+          return fail(409, "บรีฟถูกเปลี่ยนแล้ว กรุณาโหลดข้อมูลล่าสุด");
+        const body = request.postDataJSON();
+        state.lead = {
+          ...state.lead,
+          version: state.lead.version + 1,
+          ...(body.status
+            ? { status: body.status }
+            : { followUp: { ...body.followUp, updatedAt: date } }),
+        };
+        return send(state.lead);
+      }
+    }
     if (path === "/admin/projects" && method === "POST") {
       state.created = true;
       return send(state.project, 201);
@@ -386,4 +411,120 @@ test("poll detects revoked access and clears private content", async ({
   await expect(
     page.getByText(state.project.title, { exact: true }),
   ).toHaveCount(0);
+});
+
+test("admin saves follow-up, retries without losing draft and reopens an existing project", async ({
+  page,
+}, info) => {
+  const state = await setup(page, true);
+  state.created = true;
+  await page.goto("/admin");
+  await page.getByRole("button", { name: new RegExp(validLead.title) }).click();
+  await page.getByLabel("ความสำคัญ", { exact: true }).selectOption("HIGH");
+  await page.getByLabel("วันนัดติดตาม", { exact: true }).fill("2026-01-01");
+  const note = page.getByRole("textbox", { name: "โน้ตภายใน", exact: true });
+  await note.fill("<script>private note</script> โทรติดตามรายละเอียดงาน");
+  state.crmUnavailable = true;
+  await page
+    .getByRole("button", { name: "บันทึกการติดตาม", exact: true })
+    .click();
+  await expect(page.getByRole("alert")).toContainText("ร่างยังไม่ถูกบันทึก");
+  await expect(note).toHaveValue(
+    "<script>private note</script> โทรติดตามรายละเอียดงาน",
+  );
+  await page
+    .getByRole("button", { name: "บันทึกการติดตาม", exact: true })
+    .click();
+  await expect(
+    page.getByText("บันทึกติดตามงานแล้ว", { exact: true }),
+  ).toBeVisible();
+  await page.reload();
+  await page
+    .getByRole("button", { name: "ถึงนัดติดตาม", exact: false })
+    .click();
+  await page.getByRole("button", { name: new RegExp(validLead.title) }).click();
+  await expect(note).toHaveValue(
+    "<script>private note</script> โทรติดตามรายละเอียดงาน",
+  );
+  await page
+    .getByRole("searchbox", { name: "ค้นหาบรีฟที่โหลดแล้ว" })
+    .fill("ไม่ตรงกับบรีฟ");
+  await expect(
+    page.getByRole("heading", { name: "ไม่พบในคิวที่เลือก" }),
+  ).toBeVisible();
+  await page.getByRole("searchbox", { name: "ค้นหาบรีฟที่โหลดแล้ว" }).fill("");
+  await layout(page, info, "admin-follow-up");
+  expect(
+    (
+      await new AxeBuilder({ page })
+        .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+        .analyze()
+    ).violations,
+  ).toEqual([]);
+  await expect(
+    page.getByRole("button", { name: "สร้างโปรเจกต์ส่วนตัว", exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("link", { name: "เปิดโปรเจกต์ของบรีฟนี้", exact: false })
+    .click();
+  await expect(page).toHaveURL(
+    new RegExp(`/admin/projects\\?project=${projectId}`),
+  );
+  await expect(page.locator(".wks-content")).toBeVisible();
+});
+test("admin conflicts preserve draft, require explicit reload and clear private data after revocation", async ({
+  page,
+}) => {
+  const state = await setup(page, true);
+  await page.goto("/admin");
+  await page.getByRole("button", { name: new RegExp(validLead.title) }).click();
+  const note = page.getByRole("textbox", { name: "โน้ตภายใน", exact: true });
+  await note.fill("ร่างที่ยังไม่บันทึก");
+  state.lead = {
+    ...state.lead,
+    version: 2,
+    followUp: {
+      note: "ข้อมูลใหม่จากผู้ดูแลอีกหน้าหนึ่ง",
+      priority: "NORMAL",
+      followUpDate: "",
+      updatedAt: date,
+    },
+  };
+  await page
+    .getByRole("button", { name: "บันทึกการติดตาม", exact: true })
+    .click();
+  await expect(page.getByRole("alert")).toContainText("บรีฟถูกเปลี่ยนแล้ว");
+  await expect(note).toHaveValue("ร่างที่ยังไม่บันทึก");
+  await expect(
+    page.getByRole("button", { name: "บันทึกการติดตาม", exact: true }),
+  ).toBeDisabled();
+  page.once("dialog", (d) => d.accept());
+  await page
+    .getByRole("button", { name: "โหลดบรีฟล่าสุด", exact: true })
+    .click();
+  await expect(note).toHaveValue("ข้อมูลใหม่จากผู้ดูแลอีกหน้าหนึ่ง");
+  state.crmForbidden = true;
+  await page
+    .getByRole("button", { name: "โหลดข้อมูลล่าสุด", exact: false })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "เข้าสู่ระบบผู้ดูแล", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".crm-layout")).toHaveCount(0);
+  await expect(
+    page.getByText(validLead.contactEmail, { exact: true }),
+  ).toHaveCount(0);
+});
+test("customer accounts cannot open either admin workspace", async ({
+  page,
+}) => {
+  const state = await setup(page);
+  for (const path of ["/admin", "/admin/projects"]) {
+    await page.goto(path);
+    await expect(
+      page.getByRole("heading", { name: "บัญชีนี้ยังไม่มีสิทธิ์ผู้ดูแล" }),
+    ).toBeVisible();
+    await expect(page.locator(".crm-layout, .wks-content")).toHaveCount(0);
+  }
+  expect(state.adminRequests).toEqual([]);
 });

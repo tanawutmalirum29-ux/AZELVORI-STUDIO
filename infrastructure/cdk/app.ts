@@ -234,7 +234,7 @@ export class FoundationStack extends Stack {
     });
     api.addRoutes({
       path: "/api/v1/admin/leads/{id}",
-      methods: [apigateway.HttpMethod.PATCH],
+      methods: [apigateway.HttpMethod.GET, apigateway.HttpMethod.PATCH],
       integration,
       authorizer: jwt,
       authorizationScopes: ["azelvori/access"],
@@ -321,6 +321,8 @@ export class FoundationStack extends Stack {
     new CfnOutput(this, "CognitoClientId", { value: client.userPoolClientId });
     new CfnOutput(this, "CognitoDomain", { value: domain.baseUrl() });
     new CfnOutput(this, "OperationsTable", { value: data.tableName });
+    new CfnOutput(this, "AuditTable", { value: audit.tableName });
+    new CfnOutput(this, "AppOrigin", { value: options.appOrigin });
     new CfnOutput(this, "UserPoolId", { value: pool.userPoolId });
   }
 }

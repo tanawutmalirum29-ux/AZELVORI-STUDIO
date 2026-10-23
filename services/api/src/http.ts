@@ -5,12 +5,13 @@ import type {
   APIGatewayProxyEventV2,
   APIGatewayProxyStructuredResultV2,
 } from "aws-lambda";
-import { IdempotencyKeySchema, LeadStatusSchema } from "@azelvori/contracts";
+import { IdempotencyKeySchema, LeadUpdateSchema } from "@azelvori/contracts";
 import {
   authorizeStaff,
   HttpError,
   submitLead,
   updateLeadStatus,
+  updateLeadFollowUp,
   type Repository,
 } from "./domain";
 
@@ -45,7 +46,9 @@ export function createHandler(repo: Repository, config: ApiConfig) {
         return respond(200, {
           status: "ok",
           service: "azelvori-api",
-          schemaVersion: 1,
+          schemaVersion: 2,
+          capabilities: ["crm-follow-up", "private-workspace"],
+          intakeEnabled: config.intakeEnabled,
         });
       if (path === "/api/v1/leads" && method === "POST") {
         if (!config.intakeEnabled)
@@ -107,10 +110,21 @@ export function createHandler(repo: Repository, config: ApiConfig) {
             200,
             await repo.listLeads(event.queryStringParameters?.cursor),
           );
-        if (method === "PATCH") {
-          const status = LeadStatusSchema.safeParse(parseBody(event));
-          if (!status.success)
-            throw new HttpError(422, "VALIDATION", "สถานะไม่ถูกต้อง");
+        const leadId = path.split("/").at(-1)!;
+        if (method === "GET") {
+          const lead = await repo.getLead(leadId);
+          if (!lead) throw new HttpError(404, "NOT_FOUND", "ไม่พบบรีฟ");
+          const projectId = await repo.getLeadProject(leadId);
+          return respond(200, { lead, ...(projectId ? { projectId } : {}) });
+        }
+        if (method === "PATCH" && path !== "/api/v1/admin/leads") {
+          const update = LeadUpdateSchema.safeParse(parseBody(event));
+          if (!update.success)
+            throw new HttpError(
+              422,
+              "VALIDATION",
+              "ตรวจสอบสถานะหรือข้อมูลติดตามบรีฟอีกครั้ง",
+            );
           const rawVersion = event.headers["if-match"];
           if (!rawVersion || !/^[1-9]\d{0,8}$/.test(rawVersion))
             throw new HttpError(
@@ -120,13 +134,21 @@ export function createHandler(repo: Repository, config: ApiConfig) {
             );
           return respond(
             200,
-            await updateLeadStatus(
-              repo,
-              path.split("/").at(-1)!,
-              status.data.status,
-              Number(rawVersion),
-              jwt.sub,
-            ),
+            "status" in update.data
+              ? await updateLeadStatus(
+                  repo,
+                  leadId,
+                  update.data.status,
+                  Number(rawVersion),
+                  jwt.sub,
+                )
+              : await updateLeadFollowUp(
+                  repo,
+                  leadId,
+                  update.data.followUp,
+                  Number(rawVersion),
+                  jwt.sub,
+                ),
           );
         }
       }

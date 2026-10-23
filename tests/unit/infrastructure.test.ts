@@ -57,6 +57,13 @@ describe("AWS foundation safeguards", () => {
       AuthorizationScopes: ["azelvori/access"],
     });
     template.hasResourceProperties("AWS::ApiGatewayV2::Route", {
+      RouteKey: "GET /api/v1/admin/leads/{id}",
+      AuthorizationType: "JWT",
+      AuthorizationScopes: ["azelvori/access"],
+    });
+    template.hasOutput("AuditTable", { Value: Match.anyValue() });
+    template.hasOutput("AppOrigin", { Value: options.appOrigin });
+    template.hasResourceProperties("AWS::ApiGatewayV2::Route", {
       RouteKey: "POST /api/v1/leads",
       AuthorizationType: "NONE",
     });

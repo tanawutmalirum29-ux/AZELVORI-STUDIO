@@ -78,3 +78,7 @@ npm run test:e2e:workspace
 
 ## ที่มา/อ้างอิง
 ดูแหล่งข้อมูลบริการ AWS, Stripe และข้อกฎหมายที่ต้องตรวจยืนยันใน [06_SECURITY_LEGAL](docs/06_SECURITY_LEGAL.md) และ [03_AWS_ARCHITECTURE](docs/03_AWS_ARCHITECTURE.md).
+
+## Studio admin activation
+
+Open `/admin/login` to enter the studio desk, `/admin` for brief intake/follow-up, `/admin/projects` for project control, and `/admin/setup` for connection checks. These require a deployed backend and an active founder grant; hosting the frontend alone does not create an admin account. See [Thai activation guide and operator commands](docs/17_ADMIN_ACTIVATION.md). The operator helper defaults to a read-only plan: `npm run admin:setup -- --help`.
