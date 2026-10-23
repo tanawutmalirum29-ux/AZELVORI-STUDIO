@@ -2,7 +2,15 @@
 
 Date: 2026-10-23 (Asia/Bangkok). Baseline before implementation: `842b8c6cd6654555e7b6f1510530a37ce8b711ea`.
 
-## Local verified results
+## Completed CI evidence
+
+Application/test/infrastructure commit: [`1746c77a7c5db401b27ccd9ad4f6e2a95c11c06a`](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/commit/1746c77a7c5db401b27ccd9ad4f6e2a95c11c06a).
+
+[Studio quality gates run #4](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/actions/runs/39954890626) completed **SUCCESS** on 2026-10-23. Logs confirm 67 tests across six files, 50 browser scenarios, successful production build and CDK synthesis, and zero reported dependency vulnerabilities. Chromium and WebKit both passed all five target viewports, including keyboard skip navigation and homepage axe checks.
+
+[QA artifact](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/actions/runs/39954890626/artifacts/12502675178) contains the Playwright report, page screenshots, production frontend and synthesized templates. Artifact retention ends 2026-11-06. The subsequent documentation-only evidence commit does not change the tested application, tests, dependencies or infrastructure.
+
+## Verified results
 
 | Check | Result | Scope |
 |---|---|---|
@@ -13,7 +21,7 @@ Date: 2026-10-23 (Asia/Bangkok). Baseline before implementation: `842b8c6cd66545
 | Dependency audit | PASS, zero reported vulnerabilities after repair | `npm audit`; point-in-time tool result, not a full security audit |
 | Cloud Chromium interactive smoke | PASS | Website → all five wizard stages → explicit local draft download; no fake submission success |
 | Local responsive iframe inspection | PASS, 15 page/size combinations | Home, initial wizard, initial portal at all five target dimensions; no horizontal overflow after repair |
-| WebKit / full browser matrix | CI check required | Playwright configuration contains both engines and five viewports; see run on the actual commit |
+| Chromium / WebKit full browser matrix | 50 PASS in GitHub CI | Both engines at all five viewports; pinned source commit and run above |
 
 ## Defects found and fixed during implementation
 
@@ -25,12 +33,9 @@ Date: 2026-10-23 (Asia/Bangkok). Baseline before implementation: `842b8c6cd66545
 - Successful submission exports now include the real receipt; unsent drafts are labeled `LOCAL_DRAFT_NOT_SUBMITTED`.
 - Server target-date validation uses Asia/Bangkok to match the Thai frontend.
 - Full dependency audit identified a low-severity esbuild development-server advisory. Updated the direct dependency to patched 0.28.1 and revalidated the build.
-
 - Browser CI exposed low-contrast service numbering and concept footer text. Increased contrast and marked decorative symbols as hidden from assistive technology.
 - Browser CI exposed skipped conditional wizard validation when later consent was still unanswered. Shared per-step schemas now validate debugging fields, dates and rights independently; full strict server validation remains in place. Added three regression tests and manually confirmed all seven missing debugging fields report errors.
-
 - Client receipt handling now requires HTTP 202 and validates the receipt ID, timestamp and status at runtime. Seven transport regression cases reject generic success and malformed responses while preserving server field errors.
-
 - Reviewed saved WebKit screenshots. Replaced offscreen-only skip-link hiding with clipping (avoids a full-page capture artifact after scrolling), and made the main region focusable for keyboard skip navigation. Browser checks now verify Tab → skip link → Enter → main focus.
 
 ## Security and business regression coverage

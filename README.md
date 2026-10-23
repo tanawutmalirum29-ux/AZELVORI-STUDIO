@@ -39,6 +39,12 @@ npm run test:e2e
 
 **การเปิด AWS:** มี `amplify.yml`, security headers, SPA rewrites และ CDK template ให้แล้ว แต่ยังไม่ได้สร้างทรัพยากรหรือยืนยันการทำงานใน AWS account จริง
 
+## ผลตรวจชุดล่าสุด
+
+[CI ผ่านบนโค้ด `1746c77`](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/actions/runs/39954890626): ทดสอบระบบ 67 เคส, Chromium/WebKit 50 เคสใน 5 ขนาดจอ, build และ CDK synth ผ่าน, dependency audit ไม่พบช่องโหว่ที่รายงาน ณ เวลาตรวจ
+
+ดู [ผล QA และจุดที่แก้ไข](docs/12_QA_FOUNDATION.md) และ [สถานะงานเทียบแผน](docs/10_IMPLEMENTATION_STATUS.md) — ผลนี้ยังไม่ใช่การยืนยันระบบบน AWS จริงหรืออนุมัติเปิด production
+
 ## เอกสารแผนหลัก
 
 1. [ภาพรวมและกรอบธุรกิจ](docs/00_MASTER_PLAN.md)
