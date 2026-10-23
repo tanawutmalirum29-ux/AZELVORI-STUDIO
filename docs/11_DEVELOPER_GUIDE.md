@@ -41,7 +41,7 @@ CI runs ten browser/viewport projects: Chromium + WebKit at 320×568, 390×844, 
 
 Errors: 400 invalid JSON/key/cursor; 401 missing trusted claims; 403 permission/origin; 404 unknown route/resource; 409 version/state/idempotency conflict; 413 body too large; 415 wrong media type; 422 validation; 428 missing version; 429 quota (`Retry-After: 60`); 503 intake closed/retry; 500 sanitized internal failure. Error body is `{error:{code,message,fields?},requestId}`. All API responses are `no-store`. `/api/v1/projects`, messaging, billing and preview endpoints are not implemented and return no synthetic data.
 
-The lead validator rejects unrecognized properties (including forged roles/tenants), requires consent-notice version and rights acknowledgement, validates HTTPS references without embedded credentials, and requires reproduction details for game debugging. Body size is capped on UTF-8 decoded bytes. The wizard preserves a request UUID across network retries and changes it only when the payload changes.
+The lead validator rejects unrecognized properties (including forged roles/tenants), requires consent-notice version and rights acknowledgement, validates HTTPS references without embedded credentials, and requires reproduction details for game debugging. Body size is capped on UTF-8 decoded bytes. The wizard preserves a request UUID across network retries and changes it only when the payload changes. It validates each step independently of unanswered later consent. The browser displays receipt success only for HTTP 202 with a validated lead ID, timestamp and RECEIVED status; unexpected responses keep the draft available for retry.
 
 ## AWS deployment (not executed by this change)
 

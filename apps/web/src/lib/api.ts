@@ -1,7 +1,7 @@
+import { LeadReceiptSchema } from "@azelvori/contracts";
 import type {
   ApiErrorBody,
   LeadInput,
-  LeadReceipt,
   LeadRecord,
   LeadStatus,
 } from "@azelvori/contracts";
@@ -25,6 +25,7 @@ export class ApiError extends Error {
 export async function api<T>(
   path: string,
   options: RequestInit = {},
+  expectedStatus?: number,
 ): Promise<T> {
   if (!/^https:\/\//.test(apiBase))
     throw new ApiError(503, "NOT_CONFIGURED", "ยังไม่ได้เชื่อมต่อระบบ");
@@ -45,14 +46,33 @@ export async function api<T>(
       error?.fields,
     );
   }
+  if (expectedStatus !== undefined && response.status !== expectedStatus)
+    throw new ApiError(
+      502,
+      "INVALID_RESPONSE",
+      "ระบบยังยืนยันการรับบรีฟไม่ได้ กรุณาลองใหม่ด้วยข้อมูลเดิม",
+    );
   return body as T;
 }
-export const sendLead = (data: LeadInput, key: string) =>
-  api<LeadReceipt>("/api/v1/leads", {
-    method: "POST",
-    headers: { "Idempotency-Key": key },
-    body: JSON.stringify(data),
-  });
+export async function sendLead(data: LeadInput, key: string) {
+  const body = await api<unknown>(
+    "/api/v1/leads",
+    {
+      method: "POST",
+      headers: { "Idempotency-Key": key },
+      body: JSON.stringify(data),
+    },
+    202,
+  );
+  const receipt = LeadReceiptSchema.safeParse(body);
+  if (!receipt.success)
+    throw new ApiError(
+      502,
+      "INVALID_RESPONSE",
+      "ระบบยังยืนยันการรับบรีฟไม่ได้ กรุณาลองใหม่ด้วยข้อมูลเดิม",
+    );
+  return receipt.data;
+}
 export const getLeads = (token: string, cursor?: string) =>
   api<{ items: LeadRecord[]; nextCursor?: string }>(
     `/api/v1/admin/leads${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ""}`,

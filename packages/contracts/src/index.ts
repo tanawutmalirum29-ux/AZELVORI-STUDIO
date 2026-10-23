@@ -182,11 +182,14 @@ export type LeadRecord = Lead & {
   status: LeadStatus;
   version: number;
 };
-export type LeadReceipt = {
-  leadId: string;
-  receivedAt: string;
-  status: "RECEIVED";
-};
+export const LeadReceiptSchema = z
+  .object({
+    leadId: z.string().regex(/^LEAD-\d{4}-[A-F0-9]{16}$/),
+    receivedAt: z.iso.datetime(),
+    status: z.literal("RECEIVED"),
+  })
+  .strict();
+export type LeadReceipt = z.output<typeof LeadReceiptSchema>;
 export const LeadStatusSchema = z
   .object({ status: z.enum(LEAD_STATUSES) })
   .strict();

@@ -8,7 +8,7 @@ Date: 2026-10-23 (Asia/Bangkok). Baseline before implementation: `842b8c6cd66545
 |---|---|---|
 | TypeScript | PASS | Frontend, shared contracts, API, IaC and tests |
 | Production frontend + Lambda bundle | PASS | Vite split chunks and esbuild Node 22 target |
-| Unit / HTTP integration / Dynamo contract / infrastructure tests | 60 PASS | Five test files; no live AWS connection |
+| Unit / HTTP integration / Dynamo contract / infrastructure tests | 67 PASS | Six test files; no live AWS connection |
 | AWS CDK synthesis | PASS | Generates CloudFormation with intake disabled, MFA, JWT scopes, table protection and constrained IAM |
 | Dependency audit | PASS, zero reported vulnerabilities after repair | `npm audit`; point-in-time tool result, not a full security audit |
 | Cloud Chromium interactive smoke | PASS | Website → all five wizard stages → explicit local draft download; no fake submission success |
@@ -28,6 +28,8 @@ Date: 2026-10-23 (Asia/Bangkok). Baseline before implementation: `842b8c6cd66545
 
 - Browser CI exposed low-contrast service numbering and concept footer text. Increased contrast and marked decorative symbols as hidden from assistive technology.
 - Browser CI exposed skipped conditional wizard validation when later consent was still unanswered. Shared per-step schemas now validate debugging fields, dates and rights independently; full strict server validation remains in place. Added three regression tests and manually confirmed all seven missing debugging fields report errors.
+
+- Client receipt handling now requires HTTP 202 and validates the receipt ID, timestamp and status at runtime. Seven transport regression cases reject generic success and malformed responses while preserving server field errors.
 
 ## Security and business regression coverage
 
