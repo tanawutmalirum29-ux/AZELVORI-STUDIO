@@ -3,7 +3,7 @@
 > **AI-Powered Software & Game Development Studio**  
 > *From Ideas to Digital Reality.*
 
-**สถานะ:** Foundation Alpha — เริ่มพัฒนาเว็บไซต์, Lead API, CRM และ AWS IaC แล้ว; ยังไม่เปิดบริการจริง
+**สถานะ:** Private Workspace Alpha — มีเว็บไซต์, Lead API, CRM, คำเชิญลูกค้า, โปรเจกต์ส่วนตัว, ข้อความและการตรวจรับ milestone ใน source แล้ว; ยังไม่เปิดบริการจริง
 
 **อัปเดตแผน:** 23 ตุลาคม 2026  
 **ภาษาเริ่มต้น:** ไทย รองรับอังกฤษในระยะถัดไป  
@@ -11,7 +11,7 @@
 
 AZELVORI STUDIO คือแพลตฟอร์มธุรกิจรับพัฒนาเว็บไซต์ เว็บแอป เกม รับแก้บั๊กเกม ปรับประสิทธิภาพ และออกแบบ UI/UX โดยมีเว็บไซต์บริษัทเป็นศูนย์กลาง ไม่ต้องใช้ Facebook เป็นช่องทางหลัก ลูกค้าจัดการงานผ่านพอร์ทัลส่วนตัวพร้อมแชทเรียลไทม์ พรีวิว ทบทวนงาน และชำระเงินได้
 
-> ย่อหน้าข้างต้นคือเป้าหมายผลิตภัณฑ์ ระบบแชทลูกค้าจริง ชำระเงิน ไฟล์ พรีวิวแยกโดเมน และ AI runner ยังไม่เปิดใช้งาน ดูสถานะรายฟีเจอร์ที่ [Implementation Status](docs/10_IMPLEMENTATION_STATUS.md)
+> ย่อหน้าข้างต้นคือเป้าหมายผลิตภัณฑ์ โค้ดข้อความส่วนตัวบันทึกผ่าน backend และตรวจข้อความใหม่ทุก 15 วินาที; ยังไม่ได้ยืนยันบน AWS จริง ระบบชำระเงิน ไฟล์ พรีวิวแยกโดเมน และ AI runner ยังไม่เปิดใช้งาน ดูสถานะรายฟีเจอร์ที่ [Implementation Status](docs/10_IMPLEMENTATION_STATUS.md)
 
 ## เริ่มรันโค้ด
 
@@ -22,7 +22,7 @@ npm ci --ignore-scripts
 npm run dev
 ```
 
-เปิด `http://localhost:4173` — หน้าแรก, `/start` ฟอร์มบรีฟ 5 ขั้น, `/demo` พอร์ทัลข้อมูลสมมติ, `/login` ระบบบัญชี, `/admin` CRM ที่ต้องตรวจสิทธิ์ผ่าน API
+เปิด `http://localhost:4173` — หน้าแรก, `/start` ฟอร์มบรีฟ 5 ขั้น, `/demo` พอร์ทัลข้อมูลสมมติ, `/login` ระบบบัญชี, `/admin` CRM, `/admin/projects` จัดการโปรเจกต์, `/app` พื้นที่ลูกค้า และ `/invite` รับคำเชิญ หน้าส่วนตัวตรวจสิทธิ์ผ่าน API
 
 ไม่มี `.env` ก็เปิดดู UI ได้ ฟอร์มจะดาวน์โหลดร่างในเครื่องและไม่อ้างว่าส่งงานแล้ว ระบบจริงเชื่อมผ่านตัวแปรใน [.env.example](.env.example) และ [คู่มือพัฒนา/Deploy](docs/11_DEVELOPER_GUIDE.md)
 
@@ -33,17 +33,18 @@ npm run infra:synth -- --quiet
 # Chromium + WebKit, 5 viewports per engine (CI runs this)
 npx playwright install --with-deps chromium webkit
 npm run test:e2e
+npm run test:e2e:workspace
 ```
 
 **Stack:** React + TypeScript + Vite, Zod shared contracts, API Gateway/Lambda, DynamoDB, Cognito, AWS CDK. ข้อมูลจริงไม่ถูกฝังใน frontend และไม่มี AWS credentials ใน repo
 
 **การเปิด AWS:** มี `amplify.yml`, security headers, SPA rewrites และ CDK template ให้แล้ว แต่ยังไม่ได้สร้างทรัพยากรหรือยืนยันการทำงานใน AWS account จริง
 
-## ผลตรวจชุดล่าสุด
+## ผลตรวจและขอบเขตล่าสุด
 
-[CI ผ่านบนโค้ด `1746c77`](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/actions/runs/39954890626): ทดสอบระบบ 67 เคส, Chromium/WebKit 50 เคสใน 5 ขนาดจอ, build และ CDK synth ผ่าน, dependency audit ไม่พบช่องโหว่ที่รายงาน ณ เวลาตรวจ
+[CI ผ่านบนโค้ด `5b5af81`](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/actions/runs/39989603889): ทดสอบระบบ 115 กรณี และเบราว์เซอร์ 100 กรณี (Chromium/WebKit × 5 ขนาดจอ) พร้อม build, CDK synth, hosting preflight และ dependency audit ผ่าน ดูขอบเขตและหลักฐานใน [Workspace QA](docs/16_QA_PRIVATE_WORKSPACE.md). ผลรอบก่อนเก็บไว้ใน [Foundation QA](docs/12_QA_FOUNDATION.md)
 
-ดู [ผล QA และจุดที่แก้ไข](docs/12_QA_FOUNDATION.md) และ [สถานะงานเทียบแผน](docs/10_IMPLEMENTATION_STATUS.md) — ผลนี้ยังไม่ใช่การยืนยันระบบบน AWS จริงหรืออนุมัติเปิด production
+ดู [แบบระบบและขั้นตอนเปิด pilot](docs/15_PRIVATE_WORKSPACE_PILOT.md) และ [สถานะงานเทียบแผน](docs/10_IMPLEMENTATION_STATUS.md) — ผลทดสอบ source ยังไม่ใช่การยืนยันระบบบน AWS จริงหรืออนุมัติเปิด production
 
 **ภาพแบรนด์ที่เพิ่มแล้ว:** สัญลักษณ์ AZ, โลโก้แนวนอน, Favicon, ไอคอนมือถือ, ภาพปกแชร์ 1200×630 PNG, ภาพ Hero, ภาพประกอบบริการ และภาพระบบลูกค้า (รายละเอียดและตำแหน่งที่ [Brand Asset Implementation](docs/14_BRAND_ASSET_IMPLEMENTATION.md)). เป็นงานออกแบบต้นแบบสำหรับตรวจรับ ยังไม่ใช่เครื่องหมายการค้าที่ผ่านการตรวจรับทางกฎหมาย
 
@@ -73,7 +74,7 @@ npm run test:e2e
 ## ลำดับเริ่มทำงาน
 **Phase 0** รวบรวมธุรกิจ/ความเสี่ยง → **Phase 1** เว็บไซต์ + Identity + CRM → **Phase 2** Customer Portal + Chat → **Phase 3** Quotes/Payments/Preview → **Phase 4** AI-assisted workflow → **Phase 5** Beta/Pilot → **Phase 6** Scale.
 
-**ความหมายสถานะ:** เอกสาร 00–09 เป็น planning baseline; เอกสาร 10–12 และ ADR แสดงขอบเขต implementation, วิธีรัน และผลตรวจจริง ห้ามถือว่าทุกรายการใน roadmap เสร็จเพียงเพราะมีโค้ด foundation
+**ความหมายสถานะ:** เอกสาร 00–09 เป็น planning baseline; เอกสาร 10–16 และ ADR แสดงขอบเขต implementation, วิธีรัน และผลตรวจจริง ห้ามถือว่าทุกรายการใน roadmap เสร็จเพียงเพราะมีโค้ดบางส่วน
 
 ## ที่มา/อ้างอิง
 ดูแหล่งข้อมูลบริการ AWS, Stripe และข้อกฎหมายที่ต้องตรวจยืนยันใน [06_SECURITY_LEGAL](docs/06_SECURITY_LEGAL.md) และ [03_AWS_ARCHITECTURE](docs/03_AWS_ARCHITECTURE.md).

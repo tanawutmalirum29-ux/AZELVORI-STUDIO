@@ -108,7 +108,7 @@ A 200 from `/start` alone is not sufficient if JavaScript fails or a missing ass
 ## E. Current go/no-go
 
 **Frontend code can be connected to Amplify for a non-production public alpha**, provided actual AWS account configuration, build, rewrites and smoke checks pass.  
-**Not yet a live commercial service:** no verified AWS deployment, private project/chat, real payment, client previews, uploaded source sandbox, legal seller identity or public lead intake.  
+**Historical foundation scope:** this document predates the private workspace increment. Private project/chat source now exists; current behavior and remaining launch gates are in [Implementation status](10_IMPLEMENTATION_STATUS.md) and [Private workspace pilot](15_PRIVATE_WORKSPACE_PILOT.md). There is still no verified AWS deployment, real payment, client build preview, uploaded-source sandbox or completed legal/operational launch review.
 **Artwork:** all proposed image files except existing `favicon.svg` are **not created, not referenced and not generated** in this change.
 
 ## F. Before declaring complete

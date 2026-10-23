@@ -1,4 +1,4 @@
-# Implementation status — Foundation alpha
+# Implementation status — Private workspace alpha
 
 Updated: 2026-10-23 (Asia/Bangkok). This file describes actual code; the master plan describes the intended final service.
 
@@ -11,7 +11,11 @@ Updated: 2026-10-23 (Asia/Bangkok). This file describes actual code; the master 
 | Drafts | Type/budget retained seven days; full draft explicitly downloadable as JSON | Private/free-text fields deliberately not persisted automatically; refresh loses them |
 | Submission | 202 only after durable transaction; UUID idempotency; duplicate body conflict; retry; 24KB cap; honeypot; per-IP minute quota | Disabled by default; needs real deployment and reviewed notices |
 | Lead CRM | Founder-only list, cursor pagination, details, allowed status transitions, version conflict detection | Staff grant must be provisioned by authorized operator; no quote/payment execution |
-| Identity | Cognito IaC, hosted code flow + PKCE, session handling, callback error UX, logout/revocation | AWS end-to-end login, invitation lifecycle and recovery not yet verified; self-signup off |
+| Identity | Cognito IaC, hosted code flow + PKCE, explicit email verification, invite-only account provisioning, callback/logout UX | Real AWS login, MFA, email delivery and recovery not yet verified; self-signup off; no automatic token refresh |
+| Invitations | 256-bit token stored as hash, verified-email binding, fixed 72-hour expiry, single-use acceptance, replacement/revocation, one-time link display | Founder shares the project link manually; Cognito sends initial account credentials separately; no automatic email resend |
+| Private projects | Qualified brief → planning workspace, active tenant membership AND project grant, founder/customer views, paged lists, member revocation | One new tenant per project in this increment; no customer organization/role/expiry management UI; creating a workspace does not activate paid work |
+| Milestones | Three weighted steps, founder sets work/review state, customer accepts exact project version, immutable acceptance, progress derives only from acceptance | No deliverable files, owner/deadline editor, contractual scope snapshot or preview build/hash approval |
+| Project messages | Transactional persistence + audit + idempotency, escaped text, paging, server author/time, draft-preserving retries, visible-tab polling every 15 seconds | Single customer-visible channel; no internal notes, AppSync events, presence, unread counts, notifications or attachments |
 | IAM/audit | Strong grant reads, gateway JWT/scope checks, separate append-only audit writes, no Scan/DeleteItem privileges | Does not replace independent cloud authorization review |
 | Portal demo | Overview, milestone-derived progress, device preview, version-pinned sample comments/approval, escaped chat, file/scope examples | Public synthetic content; memory only; no realtime/customer data |
 | AWS source | Cognito, Lambda, HTTP API, two DynamoDB tables, PITR/retention, logs, alarm, optional monthly budget | Synthesized locally; no cloud resources created in this task |
@@ -27,20 +31,23 @@ Updated: 2026-10-23 (Asia/Bangkok). This file describes actual code; the master 
 | P-004 | Baseline validation, idempotency, honeypot, distributed rate counters implemented; live abuse tests pending |
 | P-005 | Transparent alpha notices present; legal identity/contact and reviewed production policies pending |
 | P-006/P-007/P-008 | CMS, full SEO/localization pending; alpha intentionally noindex |
-| I-001/I-004 | Cognito and client code foundation; deployed auth/session verification pending |
-| I-002/I-003 | Invitation tokens, tenant and project membership not implemented |
+| I-001/I-004 | Cognito and verified-email client/server flow; deployed auth/MFA/recovery/logout verification and refresh handling pending |
+| I-002 | Hashed single-use token, fixed 72h expiry, revoke/replace implemented; adjustable expiry and automatic resend deferred |
+| I-003 | Active tenant + project membership checks and revocation implemented; membership expiry/multiple customer roles deferred |
 | C-001 | Lead list/status implemented; assignments/notes/notifications still pending |
 | C-002 | All five intake service types supported |
 | A-002/A-004 | Backend-gated CRM and mutation audit implemented for current routes |
-| C-003–C-010, T-001–T-010, R-001–R-010, PYM-001–PYM-009 | Planned only; demo UI does not implement private projects, payments, storage or realtime |
+| C-005/C-006/C-007 | Planning workspace and simplified work states/milestone acceptance implemented; deposit-triggered activation, full commercial states, deadlines/owners/blockers deferred |
+| T-001/T-002/T-004/T-010 | One customer-visible channel, durable messages/idempotency, timestamp + UUID tie-break, pagination and 15s polling; internal channels absent, ULID/event reconnect/catch-up pending |
+| C-003/C-004/C-008/C-009/C-010, T-003/T-005–T-009, R-001–R-010, PYM-001–PYM-009 | Quotes, payments, storage, AppSync, protected build previews and remaining conversation features planned only |
 | AI-001–AI-008 | Planned only; no fake running agents or synthetic execution receipts |
 
 ## Next concrete increment
 
 1. Confirm AWS account/region/domain, operational budget and truthful legal contact. Configure a staging stack with intake closed.
 2. Verify actual hosted login/logout/MFA and staff revocation; test Dynamo transaction/rate semantics in staging.
-3. Add invitation tokens, tenant/project memberships and object grants; enforce A/B negative tests before any customer data.
-4. Add project CRUD and milestones, private S3 quarantine, durable conversations/outbox; then AppSync reconnect and scoped subscriptions.
-5. Add quote snapshots and sandbox payment webhooks before activating paid projects. Preview isolation and version approvals follow.
+3. Run the [private workspace staging checklist](15_PRIVATE_WORKSPACE_PILOT.md) with two synthetic customers; source tests already cover A/B denial, invitation lifecycle and revocation races.
+4. Add private S3 quarantine/download grants and immutable deliverable/preview versions. Expand milestone scope, owners and deadlines.
+5. Add quote snapshots and sandbox payment webhooks before activating paid projects; add notifications/outbox and AppSync reconnect with scoped subscriptions.
 
 No milestone percentage is inferred from file count. Foundation alpha is useful development progress, not completion of the multi-phase plan.

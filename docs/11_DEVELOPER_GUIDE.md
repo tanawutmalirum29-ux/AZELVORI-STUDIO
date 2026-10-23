@@ -17,9 +17,10 @@ For browser tests outside the managed preview environment:
 ```bash
 npx playwright install --with-deps chromium webkit
 npm run test:e2e
+npm run test:e2e:workspace
 ```
 
-CI runs ten browser/viewport projects: Chromium + WebKit at 320×568, 390×844, 768×1024, 844×390, 1440×900. It saves reports, failure traces and screenshots. `/__qa` is a Vite development-only iframe harness; it is not bundled or published and is not a substitute for WebKit/device testing.
+Each browser suite runs ten browser/viewport projects: Chromium + WebKit at 320×568, 390×844, 768×1024, 844×390, 1440×900. Workspace tests run a separate configured Vite server on 4174, seed a synthetic OIDC session only inside Playwright, and intercept API requests with explicit HTTP fixtures. This is not live AWS login or a production authentication bypass. CI saves both reports, failure traces and screenshots. `/__qa` is a Vite development-only iframe harness; it is not bundled or published and is not a substitute for WebKit/device testing.
 
 ## Source boundaries
 
@@ -39,7 +40,7 @@ CI runs ten browser/viewport projects: Chromium + WebKit at 320×568, 390×844, 
 | GET `/api/v1/admin/leads?cursor=...` | Cognito access token + `azelvori/access` + active founder DB grant | 25 records, opaque cursor; no global scan |
 | PATCH `/api/v1/admin/leads/{id}` | Same founder checks | `{ "status": "ACKNOWLEDGED" }`, integer `If-Match` version; optimistic transaction + audit |
 
-Errors: 400 invalid JSON/key/cursor; 401 missing trusted claims; 403 permission/origin; 404 unknown route/resource; 409 version/state/idempotency conflict; 413 body too large; 415 wrong media type; 422 validation; 428 missing version; 429 quota (`Retry-After: 60`); 503 intake closed/retry; 500 sanitized internal failure. Error body is `{error:{code,message,fields?},requestId}`. All API responses are `no-store`. `/api/v1/projects`, messaging, billing and preview endpoints are not implemented and return no synthetic data.
+Errors: 400 invalid JSON/key/cursor; 401 missing trusted claims; 403 permission/origin; 404 unknown route/resource; 409 version/state/idempotency conflict; 410 expired/replaced invitation; 413 body too large; 415 wrong media type; 422 validation; 428 missing version; 429 quota (`Retry-After: 60`); 503 intake closed/retry; 500 sanitized internal failure. Error body is `{error:{code,message,fields?},requestId}`. All API responses are `no-store`. Project, invitation, membership and messaging endpoints are documented in [Private workspace API](15_PRIVATE_WORKSPACE_PILOT.md). Billing and preview endpoints remain unimplemented and return no synthetic data.
 
 The lead validator rejects unrecognized properties (including forged roles/tenants), requires consent-notice version and rights acknowledgement, validates HTTPS references without embedded credentials, and requires reproduction details for game debugging. Body size is capped on UTF-8 decoded bytes. The wizard preserves a request UUID across network retries and changes it only when the payload changes. It validates each step independently of unanswered later consent. The browser displays receipt success only for HTTP 202 with a validated lead ID, timestamp and RECEIVED status; unexpected responses keep the draft available for retry.
 
@@ -67,7 +68,7 @@ Stack outputs map to `apps/web/.env.local` for development or Amplify environmen
 | CognitoDomain | VITE_COGNITO_DOMAIN |
 | Chosen actual public origin | VITE_SITE_URL (reserved for future canonical metadata) |
 
-The callback is exactly `APP_ORIGIN/auth/callback`; logout returns to `APP_ORIGIN/login`. No trailing slash in `APP_ORIGIN`. Cognito requires TOTP MFA and invitation-based users; no self-registration in alpha. Create the founder's account via the authorized AWS identity workflow. Backend grant provisioning is separate from login:
+The callback is exactly `APP_ORIGIN/auth/callback`; logout returns to `APP_ORIGIN/login`. No trailing slash in `APP_ORIGIN`. The client now requests `openid email aws.cognito.signin.user.admin azelvori/access`; redeploy the updated pool client and sign in again before testing email verification. The Lambda receives `USER_POOL_ID` from CDK; Cognito account-provisioning IAM is limited to that pool. Cognito requires TOTP MFA and invitation-based users; no self-registration in alpha. Create the founder's account via the authorized AWS identity workflow. Backend grant provisioning is separate from login:
 
 ```json
 {
@@ -96,7 +97,7 @@ Enabling live intake requires accurate reviewed identity/contact/privacy notices
 
 ## Limitations and safe operation
 
-- No SES acknowledgement emails yet: the UI only claims a persisted receipt, not that an email was sent.
+- No SES brief acknowledgement emails yet: brief submission only claims a persisted receipt. The workspace invitation flow separately invokes Cognito account email delivery for new accounts; existing users receive no automatic resend.
 - Browser sessions use per-tab sessionStorage; no persistent localStorage tokens. Access tokens expire in five minutes. Silent refresh and full account lifecycle remain future work. Test logout/revocation against Cognito; offline JWT validation can honor an issued token until expiration, while DB grant revocation applies on every staff request.
 - Lead metadata retention is not automated in alpha. Idempotency receipts have seven-day TTL; rate records have short TTL. TTL cleanup is asynchronous. Publish/review retention and erasure operations before real PII intake.
 - Idempotency memory/model and Dynamo command assertions do not prove actual AWS transaction behavior; staging tests are mandatory.
