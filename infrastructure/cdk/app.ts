@@ -1,0 +1,297 @@
+import {
+  App,
+  Stack,
+  Duration,
+  RemovalPolicy,
+  CfnOutput,
+  Tags,
+  aws_dynamodb as dynamodb,
+  aws_cognito as cognito,
+  aws_lambda as lambda,
+  aws_iam as iam,
+  aws_logs as logs,
+  aws_apigatewayv2 as apigateway,
+  aws_apigatewayv2_authorizers as authorizers,
+  aws_apigatewayv2_integrations as integrations,
+  aws_cloudwatch as cloudwatch,
+  aws_budgets as budgets,
+} from "aws-cdk-lib";
+import { fileURLToPath } from "node:url";
+import { Construct } from "constructs";
+
+export type FoundationOptions = {
+  stage: "dev" | "staging" | "prod";
+  appOrigin: string;
+  intakeEnabled: boolean;
+  legalReady: boolean;
+  budgetEmail?: string;
+  budgetUsd?: number;
+};
+export function validateOptions(o: FoundationOptions) {
+  if (!["dev", "staging", "prod"].includes(o.stage))
+    throw new Error("stage must be dev, staging or prod");
+  const url = new URL(o.appOrigin);
+  if (
+    url.origin !== o.appOrigin ||
+    (url.protocol !== "https:" &&
+      !(
+        o.stage === "dev" &&
+        url.hostname === "localhost" &&
+        url.protocol === "http:"
+      ))
+  )
+    throw new Error(
+      "appOrigin must be an HTTPS origin without a trailing slash (localhost HTTP allowed only in dev)",
+    );
+  if (o.intakeEnabled && !o.legalReady)
+    throw new Error(
+      "Intake requires legalReady after publishing reviewed identity and privacy notices",
+    );
+  if (o.stage === "prod" && (!o.budgetEmail || !o.budgetUsd || !o.legalReady))
+    throw new Error(
+      "Production requires legalReady, budgetEmail and budgetUsd",
+    );
+  if (o.budgetEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(o.budgetEmail))
+    throw new Error("Invalid budget email");
+  if (
+    o.budgetUsd !== undefined &&
+    (!Number.isFinite(o.budgetUsd) || o.budgetUsd <= 0)
+  )
+    throw new Error("Budget must be positive");
+}
+export class FoundationStack extends Stack {
+  constructor(scope: Construct, id: string, options: FoundationOptions) {
+    super(scope, id);
+    validateOptions(options);
+    Tags.of(this).add("Project", "AZELVORI-STUDIO");
+    Tags.of(this).add("Environment", options.stage);
+    const data = new dynamodb.Table(this, "Operations", {
+      partitionKey: { name: "pk", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "sk", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
+      timeToLiveAttribute: "expiresAt",
+      deletionProtection: true,
+      removalPolicy: RemovalPolicy.RETAIN,
+    });
+    data.addGlobalSecondaryIndex({
+      indexName: "gsi1",
+      partitionKey: { name: "gsi1pk", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "gsi1sk", type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+    const audit = new dynamodb.Table(this, "Audit", {
+      partitionKey: { name: "pk", type: dynamodb.AttributeType.STRING },
+      sortKey: { name: "sk", type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+      pointInTimeRecoverySpecification: { pointInTimeRecoveryEnabled: true },
+      deletionProtection: true,
+      removalPolicy: RemovalPolicy.RETAIN,
+    });
+    const pool = new cognito.UserPool(this, "Identity", {
+      selfSignUpEnabled: false,
+      signInAliases: { email: true },
+      autoVerify: { email: true },
+      standardAttributes: { email: { required: true, mutable: false } },
+      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+      mfa: cognito.Mfa.REQUIRED,
+      mfaSecondFactor: { sms: false, otp: true },
+      passwordPolicy: {
+        minLength: 14,
+        requireDigits: true,
+        requireLowercase: true,
+        requireUppercase: true,
+        requireSymbols: true,
+      },
+      deletionProtection: true,
+      removalPolicy: RemovalPolicy.RETAIN,
+    });
+    const scopeAccess = new cognito.ResourceServerScope({
+      scopeName: "access",
+      scopeDescription:
+        "Authenticated studio API access; staff grants are checked separately",
+    });
+    const resource = pool.addResourceServer("StudioApiScope", {
+      identifier: "azelvori",
+      scopes: [scopeAccess],
+    });
+    const client = pool.addClient("WebClient", {
+      generateSecret: false,
+      preventUserExistenceErrors: true,
+      enableTokenRevocation: true,
+      authFlows: { userSrp: true },
+      accessTokenValidity: Duration.minutes(5),
+      idTokenValidity: Duration.minutes(5),
+      refreshTokenValidity: Duration.hours(8),
+      oAuth: {
+        flows: { authorizationCodeGrant: true },
+        scopes: [
+          cognito.OAuthScope.OPENID,
+          cognito.OAuthScope.EMAIL,
+          cognito.OAuthScope.resourceServer(resource, scopeAccess),
+        ],
+        callbackUrls: [`${options.appOrigin}/auth/callback`],
+        logoutUrls: [`${options.appOrigin}/login`],
+      },
+    });
+    const domain = pool.addDomain("ManagedLogin", {
+      cognitoDomain: {
+        domainPrefix: `azelvori-${options.stage}-${this.account}`,
+      },
+    });
+    const logGroup = new logs.LogGroup(this, "ApiLogs", {
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: RemovalPolicy.RETAIN,
+    });
+    const fn = new lambda.Function(this, "Api", {
+      runtime: lambda.Runtime.NODEJS_22_X,
+      handler: "index.handler",
+      code: lambda.Code.fromAsset(
+        fileURLToPath(new URL("../../services/api/dist", import.meta.url)),
+      ),
+      timeout: Duration.seconds(15),
+      memorySize: 256,
+      reservedConcurrentExecutions: 5,
+      logGroup,
+      environment: {
+        DATA_TABLE: data.tableName,
+        AUDIT_TABLE: audit.tableName,
+        APP_ORIGIN: options.appOrigin,
+        INTAKE_ENABLED: String(options.intakeEnabled),
+      },
+    });
+    // Audit: PutItem only. The runtime cannot alter or delete historical audit events.
+    fn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:Query",
+        ],
+        resources: [data.tableArn, `${data.tableArn}/index/gsi1`],
+      }),
+    );
+    fn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["dynamodb:PutItem"],
+        resources: [audit.tableArn],
+      }),
+    );
+    const api = new apigateway.HttpApi(this, "HttpApi", {
+      corsPreflight: {
+        allowOrigins: [options.appOrigin],
+        allowMethods: [
+          apigateway.CorsHttpMethod.GET,
+          apigateway.CorsHttpMethod.POST,
+          apigateway.CorsHttpMethod.PATCH,
+          apigateway.CorsHttpMethod.OPTIONS,
+        ],
+        allowHeaders: [
+          "content-type",
+          "authorization",
+          "idempotency-key",
+          "if-match",
+        ],
+        maxAge: Duration.hours(1),
+      },
+    });
+    const integration = new integrations.HttpLambdaIntegration(
+      "ApiHandler",
+      fn,
+    );
+    const issuer = `https://cognito-idp.${this.region}.${this.urlSuffix}/${pool.userPoolId}`;
+    const jwt = new authorizers.HttpJwtAuthorizer("CognitoJwt", issuer, {
+      jwtAudience: [client.userPoolClientId],
+    });
+    api.addRoutes({
+      path: "/health",
+      methods: [apigateway.HttpMethod.GET],
+      integration,
+    });
+    api.addRoutes({
+      path: "/api/v1/leads",
+      methods: [apigateway.HttpMethod.POST],
+      integration,
+    });
+    api.addRoutes({
+      path: "/api/v1/admin/leads",
+      methods: [apigateway.HttpMethod.GET],
+      integration,
+      authorizer: jwt,
+      authorizationScopes: ["azelvori/access"],
+    });
+    api.addRoutes({
+      path: "/api/v1/admin/leads/{id}",
+      methods: [apigateway.HttpMethod.PATCH],
+      integration,
+      authorizer: jwt,
+      authorizationScopes: ["azelvori/access"],
+    });
+    const accessLogs = new logs.LogGroup(this, "AccessLogs", {
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: RemovalPolicy.RETAIN,
+    });
+    const stage = api.defaultStage?.node.defaultChild as apigateway.CfnStage;
+    stage.defaultRouteSettings = {
+      throttlingBurstLimit: 20,
+      throttlingRateLimit: 10,
+    };
+    stage.accessLogSettings = {
+      destinationArn: accessLogs.logGroupArn,
+      format:
+        '{"requestId":"$context.requestId","route":"$context.routeKey","status":"$context.status","latency":"$context.responseLatency"}',
+    };
+    new cloudwatch.Alarm(this, "ApiErrors", {
+      metric: fn.metricErrors({ period: Duration.minutes(5) }),
+      threshold: 3,
+      evaluationPeriods: 1,
+      treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+      alarmDescription:
+        "Connect an operational notification action before opening intake",
+    });
+    if (options.budgetEmail && options.budgetUsd)
+      new budgets.CfnBudget(this, "MonthlyBudget", {
+        budget: {
+          budgetName: `azelvori-${options.stage}-account-monthly`,
+          budgetType: "COST",
+          timeUnit: "MONTHLY",
+          budgetLimit: { amount: options.budgetUsd, unit: "USD" },
+        },
+        notificationsWithSubscribers: [50, 80, 100].map((threshold) => ({
+          notification: {
+            notificationType: "ACTUAL",
+            comparisonOperator: "GREATER_THAN",
+            thresholdType: "PERCENTAGE",
+            threshold,
+          },
+          subscribers: [
+            { subscriptionType: "EMAIL", address: options.budgetEmail! },
+          ],
+        })),
+      });
+    new CfnOutput(this, "ApiBaseUrl", { value: api.apiEndpoint });
+    new CfnOutput(this, "CognitoAuthority", { value: issuer });
+    new CfnOutput(this, "CognitoClientId", { value: client.userPoolClientId });
+    new CfnOutput(this, "CognitoDomain", { value: domain.baseUrl() });
+    new CfnOutput(this, "OperationsTable", { value: data.tableName });
+    new CfnOutput(this, "UserPoolId", { value: pool.userPoolId });
+  }
+}
+// Importing the stack for assertions must not synthesize a second app.
+if (process.argv[1]?.endsWith("/app.ts")) {
+  const app = new App();
+  const stage = app.node.tryGetContext("stage") ?? "dev";
+  new FoundationStack(app, `Azelvori-${stage}`, {
+    stage,
+    appOrigin: app.node.tryGetContext("appOrigin") ?? "http://localhost:4173",
+    intakeEnabled: app.node.tryGetContext("intakeEnabled") === "true",
+    legalReady: app.node.tryGetContext("legalReady") === "true",
+    budgetEmail: app.node.tryGetContext("budgetEmail"),
+    budgetUsd: app.node.tryGetContext("budgetUsd")
+      ? Number(app.node.tryGetContext("budgetUsd"))
+      : undefined,
+  });
+}

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Local responsive QA</title>
+    <style>
+      body {
+        margin: 16px;
+        background: #343a40;
+        color: white;
+        font: 14px sans-serif;
+      }
+      button,
+      a {
+        padding: 10px;
+        margin: 3px;
+        color: inherit;
+        background: #151c23;
+        border: 1px solid #76828c;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      iframe {
+        display: block;
+        margin-top: 15px;
+        background: white;
+        border: 1px solid white;
+        max-width: none;
+      }
+      nav {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      p {
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Local responsive QA</h1>
+    <p>
+      Development only. Iframe viewport checks do not replace engine/device
+      testing.
+    </p>
+    <nav id="sizes">
+      <button data-size="320,568">320 × 568</button
+      ><button data-size="390,844">390 × 844</button
+      ><button data-size="768,1024">768 × 1024</button
+      ><button data-size="844,390">844 × 390</button
+      ><button data-size="1440,900">1440 × 900</button>
+    </nav>
+    <nav id="routes">
+      <button data-route="/">Home</button
+      ><button data-route="/start">Brief</button
+      ><button data-route="/demo">Portal</button
+      ><button data-route="/login">Login</button
+      ><button data-route="/admin">Admin</button
+      ><button data-route="/privacy">Privacy</button>
+    </nav>
+    <iframe
+      title="Responsive test viewport"
+      src="/"
+      width="320"
+      height="568"
+    ></iframe>
+    <script>
+      const frame = document.querySelector("iframe");
+      document.querySelector("#sizes").addEventListener("click", (e) => {
+        if (!e.target.dataset.size) return;
+        const [w, h] = e.target.dataset.size.split(",");
+        frame.width = w;
+        frame.height = h;
+      });
+      document.querySelector("#routes").addEventListener("click", (e) => {
+        if (e.target.dataset.route) frame.src = e.target.dataset.route;
+      });
+    </script>
+  </body>
+</html>

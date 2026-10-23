@@ -3,12 +3,41 @@
 > **AI-Powered Software & Game Development Studio**  
 > *From Ideas to Digital Reality.*
 
-**สถานะ:** Architecture & Product Planning — ยังไม่เริ่มพัฒนาระบบจริง  
+**สถานะ:** Foundation Alpha — เริ่มพัฒนาเว็บไซต์, Lead API, CRM และ AWS IaC แล้ว; ยังไม่เปิดบริการจริง
+
 **อัปเดตแผน:** 23 ตุลาคม 2026  
 **ภาษาเริ่มต้น:** ไทย รองรับอังกฤษในระยะถัดไป  
 **หลักการ:** AWS-first / Customer-first / Privacy by design / Human-approved AI
 
 AZELVORI STUDIO คือแพลตฟอร์มธุรกิจรับพัฒนาเว็บไซต์ เว็บแอป เกม รับแก้บั๊กเกม ปรับประสิทธิภาพ และออกแบบ UI/UX โดยมีเว็บไซต์บริษัทเป็นศูนย์กลาง ไม่ต้องใช้ Facebook เป็นช่องทางหลัก ลูกค้าจัดการงานผ่านพอร์ทัลส่วนตัวพร้อมแชทเรียลไทม์ พรีวิว ทบทวนงาน และชำระเงินได้
+
+> ย่อหน้าข้างต้นคือเป้าหมายผลิตภัณฑ์ ระบบแชทลูกค้าจริง ชำระเงิน ไฟล์ พรีวิวแยกโดเมน และ AI runner ยังไม่เปิดใช้งาน ดูสถานะรายฟีเจอร์ที่ [Implementation Status](docs/10_IMPLEMENTATION_STATUS.md)
+
+## เริ่มรันโค้ด
+
+ใช้ Node.js 22.14 ขึ้นไป และ npm:
+
+```bash
+npm ci --ignore-scripts
+npm run dev
+```
+
+เปิด `http://localhost:4173` — หน้าแรก, `/start` ฟอร์มบรีฟ 5 ขั้น, `/demo` พอร์ทัลข้อมูลสมมติ, `/login` ระบบบัญชี, `/admin` CRM ที่ต้องตรวจสิทธิ์ผ่าน API
+
+ไม่มี `.env` ก็เปิดดู UI ได้ ฟอร์มจะดาวน์โหลดร่างในเครื่องและไม่อ้างว่าส่งงานแล้ว ระบบจริงเชื่อมผ่านตัวแปรใน [.env.example](.env.example) และ [คู่มือพัฒนา/Deploy](docs/11_DEVELOPER_GUIDE.md)
+
+```bash
+npm run build
+npm test
+npm run infra:synth -- --quiet
+# Chromium + WebKit, 5 viewports per engine (CI runs this)
+npx playwright install --with-deps chromium webkit
+npm run test:e2e
+```
+
+**Stack:** React + TypeScript + Vite, Zod shared contracts, API Gateway/Lambda, DynamoDB, Cognito, AWS CDK. ข้อมูลจริงไม่ถูกฝังใน frontend และไม่มี AWS credentials ใน repo
+
+**การเปิด AWS:** มี `amplify.yml`, security headers, SPA rewrites และ CDK template ให้แล้ว แต่ยังไม่ได้สร้างทรัพยากรหรือยืนยันการทำงานใน AWS account จริง
 
 ## เอกสารแผนหลัก
 
@@ -36,7 +65,7 @@ AZELVORI STUDIO คือแพลตฟอร์มธุรกิจรับ�
 ## ลำดับเริ่มทำงาน
 **Phase 0** รวบรวมธุรกิจ/ความเสี่ยง → **Phase 1** เว็บไซต์ + Identity + CRM → **Phase 2** Customer Portal + Chat → **Phase 3** Quotes/Payments/Preview → **Phase 4** AI-assisted workflow → **Phase 5** Beta/Pilot → **Phase 6** Scale.
 
-**ความหมายสถานะ:** เอกสารทั้งหมดเป็นข้อเสนอการออกแบบและเกณฑ์ส่งมอบ ยังไม่ใช่การยืนยันว่าระบบ ฟังก์ชัน ความปลอดภัย หรือ AWS ได้ติดตั้งแล้ว
+**ความหมายสถานะ:** เอกสาร 00–09 เป็น planning baseline; เอกสาร 10–12 และ ADR แสดงขอบเขต implementation, วิธีรัน และผลตรวจจริง ห้ามถือว่าทุกรายการใน roadmap เสร็จเพียงเพราะมีโค้ด foundation
 
 ## ที่มา/อ้างอิง
 ดูแหล่งข้อมูลบริการ AWS, Stripe และข้อกฎหมายที่ต้องตรวจยืนยันใน [06_SECURITY_LEGAL](docs/06_SECURITY_LEGAL.md) และ [03_AWS_ARCHITECTURE](docs/03_AWS_ARCHITECTURE.md).

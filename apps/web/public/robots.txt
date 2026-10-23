@@ -1,0 +1,3 @@
+User-agent: *
+Disallow: /
+# Alpha: enable indexing and add the verified canonical domain only after launch review.
