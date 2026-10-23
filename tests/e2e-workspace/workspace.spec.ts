@@ -231,7 +231,10 @@ test("customer message retries keep draft and key, escape markup, survive reload
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await page.goto("/app");
-  const draft = page.getByLabel("ข้อความถึงสตูดิโอ", { exact: true });
+  const draft = page.getByRole("textbox", {
+    name: "ข้อความถึงสตูดิโอ",
+    exact: true,
+  });
   const text = "<script>alert(1)</script> ตรวจรายละเอียดงานสำหรับมือถือครับ";
   await draft.fill(text);
   await page.getByRole("button", { name: "ส่งข้อความ", exact: true }).click();
@@ -271,6 +274,7 @@ test("review confirmation pins displayed version and reloads after conflict", as
   await expect(
     page.getByText("ข้อมูลเปลี่ยนแล้ว กรุณาตรวจเวอร์ชันใหม่", { exact: true }),
   ).toBeVisible();
+  await expect(page.getByText("เวอร์ชัน 2", { exact: true })).toBeVisible();
   await page
     .getByRole("button", { name: "ตรวจรับ milestone", exact: true })
     .click();
