@@ -27,6 +27,7 @@ jobs:
       - run: npm audit --audit-level=high
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e
+      - run: npm run test:e2e:workspace
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
@@ -34,6 +35,8 @@ jobs:
           path: |
             playwright-report/
             test-results/
+            workspace-report/
+            workspace-test-results/
             apps/web/dist/
             cdk.out/*.template.json
           retention-days: 14

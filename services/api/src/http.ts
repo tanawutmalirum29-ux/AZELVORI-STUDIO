@@ -1,3 +1,6 @@
+import { parseBody } from "./request";
+import { workspaceRoute } from "./workspace-http";
+import type { WorkspaceService } from "./workspace";
 import type {
   APIGatewayProxyEventV2,
   APIGatewayProxyStructuredResultV2,
@@ -11,7 +14,11 @@ import {
   type Repository,
 } from "./domain";
 
-export type ApiConfig = { intakeEnabled: boolean; allowedOrigin: string };
+export type ApiConfig = {
+  intakeEnabled: boolean;
+  allowedOrigin: string;
+  workspace?: WorkspaceService;
+};
 export function createHandler(repo: Repository, config: ApiConfig) {
   return async (
     event: APIGatewayProxyEventV2,
@@ -71,6 +78,10 @@ export function createHandler(repo: Repository, config: ApiConfig) {
             event.requestContext.http.sourceIp,
           ),
         );
+      }
+      if (config.workspace) {
+        const response = await workspaceRoute(event, config.workspace);
+        if (response) return respond(response.status, response.body);
       }
       if (
         path === "/api/v1/admin/leads" ||
@@ -151,24 +162,4 @@ export function createHandler(repo: Repository, config: ApiConfig) {
       });
     }
   };
-}
-function parseBody(event: APIGatewayProxyEventV2): unknown {
-  const contentType = event.headers["content-type"]
-    ?.split(";")[0]
-    .trim()
-    .toLowerCase();
-  if (contentType !== "application/json")
-    throw new HttpError(415, "CONTENT_TYPE", "ใช้ application/json เท่านั้น");
-  if (!event.body || event.body.length > 40_000)
-    throw new HttpError(413, "BODY_TOO_LARGE", "ข้อมูลยาวเกินกำหนด");
-  const body = event.isBase64Encoded
-    ? Buffer.from(event.body, "base64").toString("utf8")
-    : event.body;
-  if (Buffer.byteLength(body) > 24_000)
-    throw new HttpError(413, "BODY_TOO_LARGE", "ข้อมูลยาวเกินกำหนด");
-  try {
-    return JSON.parse(body);
-  } catch {
-    throw new HttpError(400, "INVALID_JSON", "รูปแบบข้อมูลไม่ถูกต้อง");
-  }
 }

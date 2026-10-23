@@ -50,7 +50,7 @@ export async function api<T>(
     throw new ApiError(
       502,
       "INVALID_RESPONSE",
-      "ระบบยังยืนยันการรับบรีฟไม่ได้ กรุณาลองใหม่ด้วยข้อมูลเดิม",
+      "ระบบยังยืนยันผลรายการไม่ได้ กรุณาลองใหม่ด้วยข้อมูลเดิม",
     );
   return body as T;
 }
@@ -69,7 +69,7 @@ export async function sendLead(data: LeadInput, key: string) {
     throw new ApiError(
       502,
       "INVALID_RESPONSE",
-      "ระบบยังยืนยันการรับบรีฟไม่ได้ กรุณาลองใหม่ด้วยข้อมูลเดิม",
+      "ระบบยังยืนยันผลรายการไม่ได้ กรุณาลองใหม่ด้วยข้อมูลเดิม",
     );
   return receipt.data;
 }

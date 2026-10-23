@@ -130,6 +130,7 @@ export class FoundationStack extends Stack {
         scopes: [
           cognito.OAuthScope.OPENID,
           cognito.OAuthScope.EMAIL,
+          cognito.OAuthScope.COGNITO_ADMIN,
           cognito.OAuthScope.resourceServer(resource, scopeAccess),
         ],
         callbackUrls: [`${options.appOrigin}/auth/callback`],
@@ -160,6 +161,7 @@ export class FoundationStack extends Stack {
         AUDIT_TABLE: audit.tableName,
         APP_ORIGIN: options.appOrigin,
         INTAKE_ENABLED: String(options.intakeEnabled),
+        USER_POOL_ID: pool.userPoolId,
       },
     });
     // Audit: PutItem only. The runtime cannot alter or delete historical audit events.
@@ -170,6 +172,7 @@ export class FoundationStack extends Stack {
           "dynamodb:PutItem",
           "dynamodb:UpdateItem",
           "dynamodb:Query",
+          "dynamodb:ConditionCheckItem",
         ],
         resources: [data.tableArn, `${data.tableArn}/index/gsi1`],
       }),
@@ -178,6 +181,12 @@ export class FoundationStack extends Stack {
       new iam.PolicyStatement({
         actions: ["dynamodb:PutItem"],
         resources: [audit.tableArn],
+      }),
+    );
+    fn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ["cognito-idp:AdminCreateUser", "cognito-idp:AdminGetUser"],
+        resources: [pool.userPoolArn],
       }),
     );
     const api = new apigateway.HttpApi(this, "HttpApi", {
@@ -230,6 +239,41 @@ export class FoundationStack extends Stack {
       authorizer: jwt,
       authorizationScopes: ["azelvori/access"],
     });
+    for (const [path, methods] of [
+      ["/api/v1/me", [apigateway.HttpMethod.GET]],
+      ["/api/v1/me/email/request", [apigateway.HttpMethod.POST]],
+      ["/api/v1/me/email/verify", [apigateway.HttpMethod.POST]],
+      ["/api/v1/projects", [apigateway.HttpMethod.GET]],
+      ["/api/v1/projects/{id}", [apigateway.HttpMethod.GET]],
+      [
+        "/api/v1/projects/{id}/messages",
+        [apigateway.HttpMethod.GET, apigateway.HttpMethod.POST],
+      ],
+      [
+        "/api/v1/projects/{id}/milestones/{milestone}/accept",
+        [apigateway.HttpMethod.POST],
+      ],
+      ["/api/v1/invitations/accept", [apigateway.HttpMethod.POST]],
+      ["/api/v1/admin/projects", [apigateway.HttpMethod.POST]],
+      ["/api/v1/admin/projects/{id}", [apigateway.HttpMethod.PATCH]],
+      ["/api/v1/admin/projects/{id}/invitations", [apigateway.HttpMethod.POST]],
+      [
+        "/api/v1/admin/projects/{id}/invitations/{invite}/revoke",
+        [apigateway.HttpMethod.POST],
+      ],
+      ["/api/v1/admin/projects/{id}/members", [apigateway.HttpMethod.GET]],
+      [
+        "/api/v1/admin/projects/{id}/members/{user}/revoke",
+        [apigateway.HttpMethod.POST],
+      ],
+    ] as [string, apigateway.HttpMethod[]][])
+      api.addRoutes({
+        path,
+        methods,
+        integration,
+        authorizer: jwt,
+        authorizationScopes: ["azelvori/access"],
+      });
     const accessLogs = new logs.LogGroup(this, "AccessLogs", {
       retention: logs.RetentionDays.ONE_MONTH,
       removalPolicy: RemovalPolicy.RETAIN,

@@ -49,6 +49,7 @@ describe("AWS foundation safeguards", () => {
       GenerateSecret: false,
       AllowedOAuthFlows: ["code"],
       EnableTokenRevocation: true,
+      AllowedOAuthScopes: Match.arrayWith(["aws.cognito.signin.user.admin"]),
     });
     template.hasResourceProperties("AWS::ApiGatewayV2::Route", {
       RouteKey: "GET /api/v1/admin/leads",
@@ -72,5 +73,49 @@ describe("AWS foundation safeguards", () => {
     expect(json).not.toContain("dynamodb:Scan");
     expect(json).not.toContain("dynamodb:*");
     expect(json).not.toContain("AWS::S3::Bucket"); // Uploads are intentionally unavailable.
+  });
+  it("protects every workspace route and scopes account provisioning to its own pool", () => {
+    const template = Template.fromStack(
+      new FoundationStack(new App(), "Workspace", options),
+    );
+    const routes = Object.values(
+      template.findResources("AWS::ApiGatewayV2::Route"),
+    ) as {
+      Properties: {
+        RouteKey: string;
+        AuthorizationType: string;
+        AuthorizationScopes?: string[];
+      };
+    }[];
+    const privateRoutes = routes.filter(
+      (r) =>
+        !["POST /api/v1/leads", "GET /health"].includes(r.Properties.RouteKey),
+    );
+    expect(privateRoutes.length).toBeGreaterThanOrEqual(16);
+    for (const { Properties: p } of privateRoutes) {
+      expect(p.AuthorizationType).toBe("JWT");
+      expect(p.AuthorizationScopes).toEqual(["azelvori/access"]);
+    }
+    const policies = Object.values(
+      template.findResources("AWS::IAM::Policy"),
+    ) as {
+      Properties: {
+        PolicyDocument: {
+          Statement: { Action: string | string[]; Resource: unknown }[];
+        };
+      };
+    }[];
+    const provision = policies
+      .flatMap((p) => p.Properties.PolicyDocument.Statement)
+      .filter((s) =>
+        JSON.stringify(s.Action).includes("cognito-idp:AdminCreateUser"),
+      );
+    expect(provision).toHaveLength(1);
+    expect(provision[0].Action).toEqual([
+      "cognito-idp:AdminCreateUser",
+      "cognito-idp:AdminGetUser",
+    ]);
+    expect(JSON.stringify(provision[0].Resource)).toContain("Fn::GetAtt");
+    expect(JSON.stringify(provision[0].Resource)).not.toContain("*");
   });
 });

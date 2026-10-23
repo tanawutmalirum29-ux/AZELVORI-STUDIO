@@ -18,11 +18,13 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:workspace": "playwright test --config playwright.workspace.config.ts",
     "infra:synth": "npm run build:api && cdk synth --app 'node --import tsx infrastructure/cdk/app.ts' --output cdk.out",
     "build:api": "node scripts/build-api.mjs",
     "check": "npm run typecheck && npm test && npm run build"
   },
   "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "3.1156.0",
     "@aws-sdk/client-dynamodb": "3.1156.0",
     "@aws-sdk/lib-dynamodb": "3.1156.0",
     "@fontsource-variable/manrope": "5.3.0",

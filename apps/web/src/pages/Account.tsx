@@ -1,3 +1,4 @@
+import { ProjectCreateCard } from "./Workspace";
 import { useEffect, useState } from "react";
 import {
   LEAD_TRANSITIONS,
@@ -12,7 +13,6 @@ import {
   accessToken,
   authConfigured,
   finishLogin,
-  logout,
   signIn,
 } from "../lib/auth";
 import { getLeads, patchLead } from "../lib/api";
@@ -121,53 +121,6 @@ export function Callback() {
     </div>
   );
 }
-export function CustomerAccount() {
-  const [state, setState] = useState<"loading" | "signed-in" | "signed-out">(
-    "loading",
-  );
-  useEffect(() => {
-    if (!authConfigured) {
-      setState("signed-out");
-      return;
-    }
-    void accessToken()
-      .then(() => setState("signed-in"))
-      .catch(() => setState("signed-out"));
-  }, []);
-  return (
-    <div className="container status-page">
-      <PageIntro
-        eyebrow="CUSTOMER SPACE"
-        title={state === "loading" ? "กำลังตรวจสอบบัญชี…" : "พื้นที่ลูกค้า"}
-      />
-      {state === "signed-in" ? (
-        <>
-          <Notice>
-            เข้าสู่ระบบแล้ว ระบบโปรเจกต์จริงยังอยู่ระหว่างพัฒนา
-            หน้าตัวอย่างแยกจากบัญชีและข้อมูลจริงของคุณ
-          </Notice>
-          <button className="button secondary" onClick={() => void logout()}>
-            ออกจากระบบ
-          </button>
-        </>
-      ) : (
-        state === "signed-out" && (
-          <>
-            <Notice>
-              กรุณาเข้าสู่ระบบด้วยบัญชีที่ได้รับเชิญก่อนเข้าถึงข้อมูล
-            </Notice>
-            <a className="button" href="/login">
-              ไปหน้าเข้าสู่ระบบ <Icon name="arrow" />
-            </a>
-          </>
-        )
-      )}
-      <a className="text-link" href="/demo">
-        ดูพอร์ทัลตัวอย่าง <Icon name="northeast" />
-      </a>
-    </div>
-  );
-}
 const labels: Record<LeadStatus, string> = {
   NEW: "บรีฟใหม่",
   ACKNOWLEDGED: "รับเรื่องแล้ว",
@@ -233,6 +186,9 @@ export function Admin() {
   return (
     <div className="container admin-page">
       <div className="admin-heading">
+        <a className="button secondary small" href="/admin/projects">
+          จัดการโปรเจกต์
+        </a>
         <PageIntro eyebrow="STUDIO / CRM" title="บรีฟและโอกาสใหม่" />
         <button
           className="button secondary"
@@ -252,7 +208,14 @@ export function Admin() {
           {busy && !leads.length && <p role="status">กำลังโหลดบรีฟ…</p>}
           {!busy && !leads.length && (
             <div className="empty-state">
-              <img src="/brand/illustrations/azelvori-empty-project.svg" className="admin-empty-illustration" alt="" loading="lazy" width="1200" height="900" />
+              <img
+                src="/brand/illustrations/azelvori-empty-project.svg"
+                className="admin-empty-illustration"
+                alt=""
+                loading="lazy"
+                width="1200"
+                height="900"
+              />
               <Icon name="folder" size={35} />
               <h2>ยังไม่มีบรีฟที่แสดงได้</h2>
               <p>ระบบจะแสดงข้อมูลเมื่อเชื่อมต่อและตรวจสิทธิ์ผู้ดูแลสำเร็จ</p>
@@ -333,6 +296,7 @@ export function Admin() {
                   </>
                 )}
               </dl>
+              <ProjectCreateCard key={selected.leadId} lead={selected} />
               <h3>ดำเนินการถัดไป</h3>
               <div className="status-actions">
                 {LEAD_TRANSITIONS[selected.status].map((status) => (

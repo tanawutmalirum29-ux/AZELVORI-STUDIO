@@ -17,7 +17,7 @@ export function auth() {
       client_id: clientId,
       redirect_uri: `${location.origin}/auth/callback`,
       response_type: "code",
-      scope: "openid email azelvori/access",
+      scope: "openid email aws.cognito.signin.user.admin azelvori/access",
       automaticSilentRenew: false,
       loadUserInfo: false,
       userStore: new WebStorageStateStore({ store: sessionStorage }),
@@ -32,7 +32,7 @@ export function auth() {
     });
   return manager;
 }
-export async function signIn(destination: "app" | "admin" = "app") {
+export async function signIn(destination: "app" | "admin" | "invite" = "app") {
   await auth().signinRedirect({ state: { destination } });
 }
 let callbackPromise: Promise<void> | undefined;
@@ -42,17 +42,21 @@ export function finishLogin() {
     callbackPromise = auth()
       .signinRedirectCallback()
       .then((user) => {
+        const requested = (user.state as { destination?: string } | undefined)
+          ?.destination;
         const destination =
-          (user.state as { destination?: string } | undefined)?.destination ===
-          "admin"
+          requested === "admin"
             ? "/admin"
-            : "/app";
+            : requested === "invite"
+              ? "/invite"
+              : "/app";
         history.replaceState(null, "", "/auth/callback");
         location.replace(destination);
       });
   return callbackPromise;
 }
 export async function logout() {
+  sessionStorage.removeItem("azelvori:pending-invite");
   try {
     await auth().revokeTokens(["refresh_token"]);
   } finally {

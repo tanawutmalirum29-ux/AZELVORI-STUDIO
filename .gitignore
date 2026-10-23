@@ -3,6 +3,8 @@ dist/
 cdk.out/
 playwright-report/
 test-results/
+workspace-report/
+workspace-test-results/
 coverage/
 .env
 .env.*

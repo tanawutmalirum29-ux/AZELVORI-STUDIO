@@ -53,6 +53,8 @@ test("public pages, links, layout and honest account availability", async ({
     "/terms",
     "/cookies",
     "/app",
+    "/invite",
+    "/admin/projects",
     "/admin",
     "/not-found",
   ]) {
