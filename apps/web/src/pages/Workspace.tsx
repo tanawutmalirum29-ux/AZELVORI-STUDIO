@@ -486,6 +486,11 @@ function WorkspaceContent({
         />
         <div className="wks-top-actions">
           {identity.staff && (
+            <a className="button secondary small" href="/admin/inbox">
+              ข้อความลูกค้า
+            </a>
+          )}
+          {identity.staff && (
             <a className="button secondary small" href="/admin">
               บรีฟและ CRM
             </a>
