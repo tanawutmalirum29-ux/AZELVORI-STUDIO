@@ -656,4 +656,55 @@ export class WorkspaceService {
       op,
     );
   }
+  private async employeeAccess(actor: Actor, id: string) {
+    const employee = await this.store.get<{ active: boolean; role: string }>(meta("EMPLOYEE#" + actor.sub));
+    if (!employee?.data.active || employee.data.role !== "EMPLOYEE")
+      throw new HttpError(403, "EMPLOYEE_DISABLED", "ไม่มีสิทธิ์พนักงาน");
+    const p = await this.store.get<StudioProject>(projectKey(id));
+    if (!p) throw missing();
+    const tenant = await this.store.get<{ active: boolean }>(meta("TENANT#" + p.data.tenantId));
+    if (!tenant?.data.active) throw missing();
+    return {
+      p,
+      checks: [
+        { ...meta("EMPLOYEE#" + actor.sub), version: null, staff: "EMPLOYEE" as const },
+        check(tenant, tenant),
+      ],
+    };
+  }
+  async employeeProjects(actor: Actor, cursor?: string) {
+    const employee = await this.store.get<{ active: boolean; role: string }>(meta("EMPLOYEE#" + actor.sub));
+    if (!employee?.data.active || employee.data.role !== "EMPLOYEE")
+      throw new HttpError(403, "EMPLOYEE_DISABLED", "ไม่มีสิทธิ์พนักงาน");
+    const page = await this.store.page<{ projectId: string }>("DIRECTORY#PROJECTS", "PROJECT#", cursor);
+    const items: StudioProject[] = [];
+    for (const entry of page.items) {
+      try { items.push((await this.employeeAccess(actor, entry.data.projectId)).p.data); }
+      catch (error) { if (!(error instanceof HttpError) || error.status !== 404) throw error; }
+    }
+    return { items, ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}) };
+  }
+  async employeeMessages(actor: Actor, id: string, cursor?: string) {
+    await this.employeeAccess(actor, id);
+    const page = await this.store.page<ProjectMessage>("PROJECT#" + id, "MSG#", cursor, true);
+    return { items: page.items.map((item) => item.data).reverse(),
+      ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}) };
+  }
+  async employeeSend(actor: Actor, id: string, body: unknown, key: string) {
+    const { checks } = await this.employeeAccess(actor, id);
+    const data = parse(MessageCreateSchema, body);
+    const op = this.operation(actor, "employee.message.send:" + id, key, data);
+    const cached = await this.replay<ProjectMessage>(op);
+    if (cached) return cached;
+    await this.limited(actor, "employee.chat:" + id);
+    const createdAt = this.clock().toISOString(), messageId = randomUUID();
+    const message: ProjectMessage = {
+      messageId, projectId: id, senderId: actor.sub, senderRole: "STUDIO",
+      text: data.text, createdAt, status: "PERSISTED",
+    };
+    return this.save(actor, "employee.message.created", id, checks,
+      [row({ pk: "PROJECT#" + id, sk: "MSG#" + createdAt + "#" + messageId }, message)],
+      message, op);
+  }
+
 }
