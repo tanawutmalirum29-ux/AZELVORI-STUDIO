@@ -290,6 +290,30 @@ test("founder inbox replies, retries without duplicates and reloads saved messag
   expect(errors).toEqual([]);
 });
 
+test("founder inbox polls incoming customer messages and clears data after revoke", async ({
+  page,
+}) => {
+  const state = await setup(page, true);
+  await page.clock.install();
+  await page.goto("/admin/inbox");
+  await expect(page.getByRole("textbox", { name: "ตอบกลับลูกค้า" })).toBeVisible();
+  state.messages.push({
+    messageId: "99999999-9999-4999-8999-999999999999",
+    projectId,
+    senderId: "customer-a",
+    senderRole: "CUSTOMER",
+    text: "ข้อความใหม่จากลูกค้า",
+    createdAt: date,
+    status: "PERSISTED",
+  });
+  await page.clock.fastForward(16000);
+  await expect(page.getByText("ข้อความใหม่จากลูกค้า", { exact: true })).toBeVisible();
+  state.revoked = true;
+  await page.clock.fastForward(16000);
+  await expect(page.getByRole("link", { name: "เข้าสู่ระบบผู้ดูแล", exact: true })).toBeVisible();
+  await expect(page.getByText("ข้อความใหม่จากลูกค้า", { exact: true })).toHaveCount(0);
+});
+
 test("customer cannot enter the founder inbox or request other threads", async ({
   page,
 }) => {
