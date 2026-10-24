@@ -62,13 +62,35 @@ describe("authenticated workspace HTTP routes", () => {
         .statusCode,
     ).toBe(200);
   });
+  it("accepts Cognito native USER_PASSWORD_AUTH access scope for /me and owned messages", async () => {
+    const f = await setup();
+    const me = event("/api/v1/me");
+    (me.requestContext as any).authorizer.jwt.claims.scope = "aws.cognito.signin.user.admin";
+    const identity = await f.handle(me);
+    expect(identity.statusCode).toBe(200);
+    expect(JSON.parse(identity.body!).userId).toBe(f.a.sub);
+    const messages = event(`/api/v1/projects/${f.project.projectId}/messages`, "GET", {}, f.a.sub);
+    (messages.requestContext as any).authorizer.jwt.claims.scope = "aws.cognito.signin.user.admin";
+    expect((await f.handle(messages)).statusCode).toBe(200);
+    const foreign = event(`/api/v1/projects/${f.project.projectId}`, "GET", {}, f.b.sub);
+    (foreign.requestContext as any).authorizer.jwt.claims.scope = "aws.cognito.signin.user.admin";
+    expect((await f.handle(foreign)).statusCode).toBe(404);
+  });
+  it("native Cognito scope never grants admin access to customers", async () => {
+    const f = await setup();
+    const req = event("/api/v1/admin/projects", "POST", {
+      leadId: "nonexistent", title: "Unauthorized", summary: "Unauthorized",
+    }, f.a.sub);
+    (req.requestContext as any).authorizer.jwt.claims.scope = "aws.cognito.signin.user.admin";
+    expect((await f.handle(req)).statusCode).toBe(403);
+  });
   it("never trusts a bearer header without validated gateway claims", async () => {
     const f = await setup();
     const e = event("/api/v1/projects");
     delete (e.requestContext as any).authorizer;
     expect((await f.handle(e)).statusCode).toBe(401);
   });
-  it.each([{ token_use: "id" }, { scope: "openid" }])(
+  it.each([{ token_use: "id" }, { scope: "openid" }, { scope: "aws.cognito.signin.user.admin-extra" }, { scope: "" }])(
     "rejects invalid access claims %j",
     async (patch) => {
       const f = await setup();
