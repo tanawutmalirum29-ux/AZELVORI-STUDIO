@@ -208,7 +208,7 @@ export function FirstPartyLogin({ mode, denied = false, reason = "" }: {
                 </span>
               </label>
               <button className="button full" disabled={!configured || busy}>
-                {busy ? "กำลังตรวจสอบ…" : "เข้าสู่ระบบ"} <Icon name="arrow" size={18} />
+                {busy ? "กำลังตรวจสอบ…" : mode === "admin" ? "เข้าสู่ระบบผู้ดูแล" : "เข้าสู่พื้นที่ลูกค้า"} <Icon name="arrow" size={18} />
               </button>
               <button className="text-link first-party-forgot" type="button" disabled={busy}
                 onClick={() => { setView("forgot"); setError(""); setNotice(""); }}>
@@ -288,7 +288,7 @@ export function FirstPartyLogin({ mode, denied = false, reason = "" }: {
           {mode === "admin" ? "พื้นที่ลูกค้า" : "เข้าสู่ระบบผู้ดูแล"}
         </a>
         <a href="/privacy">ความเป็นส่วนตัว</a>
-        <a href="/admin/setup">ตรวจความพร้อมระบบ</a>
+        <a href="/admin/setup">{mode === "admin" ? "วิธีเปิดหน้าแอดมินครั้งแรก" : "ตรวจความพร้อมระบบ"}</a>
       </nav>
     </section>
   );
