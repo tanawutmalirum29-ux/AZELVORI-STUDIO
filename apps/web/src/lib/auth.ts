@@ -109,7 +109,11 @@ export async function logout() {
   loggingOut = true;
   if (hasNativeSession()) {
     sessionStorage.removeItem("azelvori:pending-invite");
-    try { await logoutNative(); } finally { location.assign("/login"); }
+    try {
+      await logoutNative();
+      // A previous hosted-OAuth session must not silently survive native sign-out.
+      await auth().removeUser();
+    } finally { location.assign("/login"); }
     return;
   }
   sessionStorage.removeItem("azelvori:pending-invite");
