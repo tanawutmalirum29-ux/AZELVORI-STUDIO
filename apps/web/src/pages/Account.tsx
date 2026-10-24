@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
 import { Icon } from "../components/Icon";
 import { Notice, PageIntro } from "../components/Layout";
-import { authConfigured, finishLogin, signIn } from "../lib/auth";
+import {
+  authConfigured,
+  finishLogin,
+  LoginCallbackError,
+  signIn,
+  type LoginDestination,
+} from "../lib/auth";
 
 export function Login() {
   const [error, setError] = useState(""),
@@ -80,26 +86,86 @@ export function Login() {
 }
 export function Callback() {
   const [error, setError] = useState("");
+  const [destination, setDestination] = useState<LoginDestination>();
   useEffect(() => {
+    let active = true;
     if (!authConfigured) {
       setError("ยังไม่ได้ตั้งค่าระบบบัญชี");
       return;
     }
-    void finishLogin().catch(() => {
-      history.replaceState(null, "", "/auth/callback");
-      setError("ยืนยันการเข้าสู่ระบบไม่สำเร็จ ลิงก์อาจหมดอายุ กรุณาเริ่มใหม่");
-    });
+    void finishLogin()
+      .then((target) => {
+        if (active) setDestination(target);
+      })
+      .catch((e: unknown) => {
+        if (active)
+          setError(
+            e instanceof LoginCallbackError
+              ? e.message
+              : "ยืนยันการเข้าสู่ระบบไม่สำเร็จ กรุณาเข้าสู่ระบบใหม่",
+          );
+      });
+    return () => {
+      active = false;
+    };
   }, []);
+  useEffect(() => {
+    if (destination) {
+      // Render success and a usable link before attempting automatic navigation.
+      // A slow/blocked document navigation must not leave a false loading screen.
+      try {
+        location.replace(destination);
+      } catch {
+        // The manual continuation link remains available.
+      }
+    }
+  }, [destination]);
   return (
     <div className="container status-page">
       <PageIntro
         eyebrow="ACCOUNT"
-        title={error ? "เข้าสู่ระบบไม่สำเร็จ" : "กำลังยืนยันบัญชี…"}
+        title={
+          error
+            ? "เข้าสู่ระบบไม่สำเร็จ"
+            : destination
+              ? "ยืนยันบัญชีแล้ว"
+              : "กำลังยืนยันบัญชี…"
+        }
       />
       {error && <Notice kind="error">{error}</Notice>}
-      <a href="/login" className="button secondary">
-        กลับหน้าเข้าสู่ระบบ
-      </a>
+      {destination ? (
+        <>
+          <p role="status">
+            กำลังเปิดพื้นที่ของคุณ หากหน้าไม่เปลี่ยน กดปุ่มด้านล่าง
+          </p>
+          <a href={destination} className="button">
+            {destination === "/admin"
+              ? "เปิดหน้าแอดมิน"
+              : destination === "/invite"
+                ? "เปิดคำเชิญ"
+                : "เปิดพื้นที่ลูกค้า"}
+          </a>
+        </>
+      ) : (
+        <>
+          {!error && (
+            <p role="status">
+              กำลังรับผลการเข้าสู่ระบบ ขั้นตอนนี้ใช้เวลาไม่เกินประมาณ 20 วินาที
+            </p>
+          )}
+          <div className="button-row">
+            <a href="/admin/login" className="button secondary">
+              เข้าสู่ระบบผู้ดูแลอีกครั้ง
+            </a>
+            <a href="/login" className="button secondary">
+              กลับหน้าเข้าสู่ระบบลูกค้า
+            </a>
+          </div>
+          <p className="small-note">
+            ทำต่อในแท็บเดิม ไม่ต้องเปลี่ยนรหัสผ่านใหม่
+          </p>
+        </>
+      )}
     </div>
   );
 }

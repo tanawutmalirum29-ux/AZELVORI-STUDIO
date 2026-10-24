@@ -4,8 +4,10 @@ const manager = vi.hoisted(() => ({
   signinSilent: vi.fn(),
   removeUser: vi.fn(),
   revokeTokens: vi.fn(),
+  signinRedirectCallback: vi.fn(),
 }));
-vi.mock("oidc-client-ts", () => ({
+vi.mock("oidc-client-ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("oidc-client-ts")>()),
   UserManager: class {
     constructor() {
       return manager;
@@ -27,14 +29,128 @@ beforeEach(() => {
   vi.stubEnv("VITE_COGNITO_DOMAIN", "https://auth.example.test");
   vi.stubGlobal("location", {
     origin: "https://studio.example.test",
+    href: "https://studio.example.test/auth/callback/?code=one-use-code&state=login-state",
+    pathname: "/auth/callback/",
     assign: vi.fn(),
+    replace: vi.fn(),
   });
+  vi.stubGlobal("history", { replaceState: vi.fn() });
   vi.stubGlobal("sessionStorage", { removeItem: vi.fn() });
   manager.getUser.mockResolvedValue(active);
 });
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
+});
+describe("login callback recovery", () => {
+  it.each([
+    ["admin", "/admin"],
+    ["invite", "/invite"],
+    ["app", "/app"],
+    ["https://untrusted.example/", "/app"],
+    [undefined, "/app"],
+  ])(
+    "only continues to a fixed local destination for %s",
+    async (destination, target) => {
+      manager.signinRedirectCallback.mockResolvedValue({
+        ...active,
+        state: { destination },
+      });
+      const auth = await import("../../apps/web/src/lib/auth");
+      expect(await auth.finishLogin()).toBe(target);
+      expect(location.replace).not.toHaveBeenCalled();
+    },
+  );
+  it("exchanges once across StrictMode mounts and scrubs the URL while pending", async () => {
+    let finish!: (v: unknown) => void;
+    manager.signinRedirectCallback.mockImplementation(
+      () =>
+        new Promise((r) => {
+          finish = r;
+        }),
+    );
+    const auth = await import("../../apps/web/src/lib/auth");
+    const first = auth.finishLogin();
+    expect(auth.finishLogin()).toBe(first);
+    await vi.waitFor(() =>
+      expect(manager.signinRedirectCallback).toHaveBeenCalledOnce(),
+    );
+    expect(manager.signinRedirectCallback).toHaveBeenCalledWith(location.href);
+    expect(history.replaceState).toHaveBeenCalledWith(
+      null,
+      "",
+      "/auth/callback/",
+    );
+    finish({ ...active, state: { destination: "admin" } });
+    expect(await first).toBe("/admin");
+    expect(auth.finishLogin()).toBe(first);
+  });
+  it("settles a stalled exchange at the deadline and removes a late saved session", async () => {
+    vi.useFakeTimers();
+    let finish!: (v: unknown) => void;
+    manager.signinRedirectCallback.mockImplementation(
+      () =>
+        new Promise((r) => {
+          finish = r;
+        }),
+    );
+    manager.removeUser.mockResolvedValue(undefined);
+    const auth = await import("../../apps/web/src/lib/auth");
+    const result = auth.finishLogin().catch((e) => e);
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(await result).toMatchObject({ reason: "timeout" });
+    expect(manager.removeUser).toHaveBeenCalledOnce();
+    finish({ ...active, state: { destination: "admin" } });
+    await vi.advanceTimersByTimeAsync(1);
+    expect(manager.removeUser).toHaveBeenCalledTimes(2);
+    expect(location.replace).not.toHaveBeenCalled();
+    expect(await auth.finishLogin().catch((e) => e)).toMatchObject({
+      reason: "timeout",
+    });
+    expect(manager.signinRedirectCallback).toHaveBeenCalledOnce();
+  });
+  it("clears the watchdog on success so it cannot later remove a valid session", async () => {
+    vi.useFakeTimers();
+    manager.signinRedirectCallback.mockResolvedValue({ ...active });
+    const auth = await import("../../apps/web/src/lib/auth");
+    expect(await auth.finishLogin()).toBe("/app");
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(manager.removeUser).not.toHaveBeenCalled();
+  });
+  it("turns synchronous failures into retryable errors without leaking provider details", async () => {
+    manager.signinRedirectCallback.mockImplementation(() => {
+      throw new Error("sensitive-provider-error?code=one-use-code");
+    });
+    const auth = await import("../../apps/web/src/lib/auth");
+    const error = await auth.finishLogin().catch((e) => e);
+    expect(error).toMatchObject({ reason: "failed" });
+    expect(error.message).not.toContain("one-use-code");
+    expect(error.message).not.toContain("sensitive-provider-error");
+  });
+  it("recognizes the library network timeout and clears its own timer on failure", async () => {
+    vi.useFakeTimers();
+    const { ErrorTimeout } = await import("oidc-client-ts");
+    manager.signinRedirectCallback.mockRejectedValue(
+      new ErrorTimeout("Network timed out"),
+    );
+    const auth = await import("../../apps/web/src/lib/auth");
+    await expect(auth.finishLogin()).rejects.toMatchObject({
+      reason: "timeout",
+    });
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(manager.removeUser).not.toHaveBeenCalled();
+  });
+  it("does not leave the page pending if browser history cleanup throws", async () => {
+    vi.mocked(history.replaceState).mockImplementation(() => {
+      throw new DOMException("Blocked", "SecurityError");
+    });
+    const auth = await import("../../apps/web/src/lib/auth");
+    await expect(auth.finishLogin()).rejects.toMatchObject({
+      reason: "failed",
+    });
+    expect(manager.signinRedirectCallback).not.toHaveBeenCalled();
+  });
 });
 describe("on-demand session refresh", () => {
   it("uses a valid token without issuing a refresh", async () => {

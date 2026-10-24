@@ -1,4 +1,8 @@
-import { UserManager, WebStorageStateStore } from "oidc-client-ts";
+import {
+  ErrorTimeout,
+  UserManager,
+  WebStorageStateStore,
+} from "oidc-client-ts";
 const authority = import.meta.env.VITE_COGNITO_AUTHORITY?.replace(/\/$/, "");
 const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
 const domain = import.meta.env.VITE_COGNITO_DOMAIN?.replace(/\/$/, "");
@@ -37,24 +41,66 @@ export function auth() {
 export async function signIn(destination: "app" | "admin" | "invite" = "app") {
   await auth().signinRedirect({ state: { destination } });
 }
-let callbackPromise: Promise<void> | undefined;
+export type LoginDestination = "/admin" | "/invite" | "/app";
+export class LoginCallbackError extends Error {
+  constructor(public readonly reason: "timeout" | "failed") {
+    super(
+      reason === "timeout"
+        ? "ระบบบัญชีตอบกลับช้า กรุณาตรวจการเชื่อมต่อแล้วเข้าสู่ระบบใหม่ในแท็บนี้"
+        : "ยืนยันการเข้าสู่ระบบไม่สำเร็จ ลิงก์อาจหมดอายุหรือเปิดจากคนละแท็บ กรุณาเข้าสู่ระบบใหม่ในแท็บนี้",
+    );
+  }
+}
+let callbackPromise: Promise<LoginDestination> | undefined;
 export function finishLogin() {
   // StrictMode and repeated renders share one exchange; authorization codes are single-use.
   if (!callbackPromise)
-    callbackPromise = auth()
-      .signinRedirectCallback()
-      .then((user) => {
-        const requested = (user.state as { destination?: string } | undefined)
-          ?.destination;
-        const destination =
-          requested === "admin"
-            ? "/admin"
-            : requested === "invite"
-              ? "/invite"
-              : "/app";
-        history.replaceState(null, "", "/auth/callback");
-        location.replace(destination);
-      });
+    callbackPromise = new Promise<LoginDestination>((resolve, reject) => {
+      let timedOut = false;
+      let callbackManager: UserManager | undefined;
+      // The library's request timeout stops at response headers. Bound the entire
+      // exchange as well, including a stalled response body or session storage.
+      const deadline = setTimeout(() => {
+        timedOut = true;
+        reject(new LoginCallbackError("timeout"));
+        void callbackManager?.removeUser().catch(() => undefined);
+      }, 20_000);
+      void Promise.resolve()
+        .then(() => {
+          const callbackUrl = location.href;
+          // Pass the original URL explicitly; never leave the one-use code in history.
+          history.replaceState(null, "", location.pathname);
+          callbackManager = auth();
+          return callbackManager.signinRedirectCallback(callbackUrl);
+        })
+        .then(async (user) => {
+          if (timedOut) {
+            // A late library response can have persisted a user. It must neither
+            // restore this abandoned sign-in nor navigate away from the retry UI.
+            await callbackManager!.removeUser();
+            return;
+          }
+          clearTimeout(deadline);
+          const requested = (user.state as { destination?: string } | undefined)
+            ?.destination;
+          resolve(
+            requested === "admin"
+              ? "/admin"
+              : requested === "invite"
+                ? "/invite"
+                : "/app",
+          );
+        })
+        .catch((error: unknown) => {
+          clearTimeout(deadline);
+          // Provider errors can contain codes/tokens: expose only our own messages.
+          reject(
+            new LoginCallbackError(
+              error instanceof ErrorTimeout ? "timeout" : "failed",
+            ),
+          );
+        });
+    });
   return callbackPromise;
 }
 export async function logout() {
