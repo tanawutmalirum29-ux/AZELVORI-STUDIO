@@ -200,6 +200,7 @@ function InboxDesk({ identity, onLost }: {
         <a href="/admin">บรีฟและคิวงาน</a>
         <a href="/admin/inbox" aria-current="page">ข้อความลูกค้า</a>
         <a href="/admin/projects">จัดการโปรเจกต์</a>
+        <a href="/admin/employees">บัญชีพนักงาน</a>
         <a href="/admin/setup">ความพร้อมระบบ</a>
       </nav>
       {error && <Notice kind="error">{error}</Notice>}

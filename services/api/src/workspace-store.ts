@@ -13,7 +13,7 @@ export type Row<T = unknown> = Key & {
   data: T;
   expiresAt?: number;
 };
-export type Check = Key & { version: number | null; staff?: boolean };
+export type Check = Key & { version: number | null; staff?: boolean | "EMPLOYEE" };
 export type Change = {
   checks: Check[];
   puts: Row[];
@@ -126,7 +126,7 @@ export class DynamoWorkspaceStore implements WorkspaceStore {
             },
             ExpressionAttributeValues: {
               ":yes": true,
-              ":role": "FOUNDER_ADMIN",
+              ":role": c.staff === "EMPLOYEE" ? "EMPLOYEE" : "FOUNDER_ADMIN",
             },
           }
         : c.version === null

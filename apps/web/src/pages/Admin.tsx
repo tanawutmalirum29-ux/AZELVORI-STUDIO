@@ -267,6 +267,7 @@ function Desk({
         </a>
         <a href="/admin/inbox">ข้อความลูกค้า</a>
         <a href="/admin/projects">จัดการโปรเจกต์</a>
+        <a href="/admin/employees">บัญชีพนักงาน</a>
         <a href="/admin/setup">ความพร้อมระบบ</a>
       </nav>
       <div className="desk-stats" aria-label="คิวจากบรีฟที่โหลดแล้ว">

@@ -108,12 +108,16 @@ describe("AWS foundation safeguards", () => {
     }[];
     const privateRoutes = routes.filter(
       (r) =>
-        !["POST /api/v1/leads", "GET /health"].includes(r.Properties.RouteKey),
+        !["POST /api/v1/leads", "GET /health", "GET /api/v1/employee/config"].includes(r.Properties.RouteKey),
     );
     expect(privateRoutes.length).toBeGreaterThanOrEqual(16);
     for (const { Properties: p } of privateRoutes) {
       expect(p.AuthorizationType).toBe("JWT");
-      expect(p.AuthorizationScopes).toEqual(["azelvori/access", "aws.cognito.signin.user.admin"]);
+      expect(p.AuthorizationScopes).toEqual(
+        p.RouteKey.includes("/api/v1/employee/")
+          ? ["aws.cognito.signin.user.admin"]
+          : ["azelvori/access", "aws.cognito.signin.user.admin"],
+      );
     }
     const policies = Object.values(
       template.findResources("AWS::IAM::Policy"),
@@ -129,13 +133,28 @@ describe("AWS foundation safeguards", () => {
       .filter((s) =>
         JSON.stringify(s.Action).includes("cognito-idp:AdminCreateUser"),
       );
-    expect(provision).toHaveLength(1);
-    expect(provision[0].Action).toEqual([
-      "cognito-idp:AdminCreateUser",
-      "cognito-idp:AdminGetUser",
-    ]);
-    expect(JSON.stringify(provision[0].Resource)).toContain("Fn::GetAtt");
-    expect(JSON.stringify(provision[0].Resource)).not.toContain("*");
+    expect(provision).toHaveLength(2);
+    expect(provision.map(p=>p.Action)).toEqual(expect.arrayContaining([
+      ["cognito-idp:AdminCreateUser", "cognito-idp:AdminGetUser"],
+      ["cognito-idp:AdminCreateUser", "cognito-idp:AdminSetUserPassword", "cognito-idp:AdminDisableUser"],
+    ]));
+    for (const policy of provision) {
+      expect(JSON.stringify(policy.Resource)).toContain("Fn::GetAtt");
+      expect(JSON.stringify(policy.Resource)).not.toContain("*");
+    }
+    template.hasResourceProperties("AWS::ApiGatewayV2::Route", {
+      RouteKey: "GET /api/v1/employee/config", AuthorizationType: "NONE",
+    });
+    template.hasResourceProperties("AWS::ApiGatewayV2::Route", {
+      RouteKey: "GET /api/v1/employee/projects", AuthorizationType: "JWT",
+      AuthorizationScopes: ["aws.cognito.signin.user.admin"],
+    });
+    template.hasResourceProperties("AWS::ApiGatewayV2::Route", {
+      RouteKey: "POST /api/v1/admin/employees", AuthorizationType: "JWT",
+      AuthorizationScopes: ["azelvori/access", "aws.cognito.signin.user.admin"],
+    });
+    template.hasOutput("EmployeePoolId", { Value: Match.anyValue() });
+    template.hasOutput("EmployeeClientId", { Value: Match.anyValue() });
   });
   it("supports low-quota private staging without a Lambda reservation and with lower route throttles", () => {
     const template = Template.fromStack(
