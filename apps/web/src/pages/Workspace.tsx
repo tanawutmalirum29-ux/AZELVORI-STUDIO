@@ -16,7 +16,7 @@ import { Notice, PageIntro } from "../components/Layout";
 import { Icon } from "../components/Icon";
 import { workspaceApi as client } from "../lib/workspace-api";
 import { ApiError } from "../lib/api";
-import { authConfigured, logout, signIn } from "../lib/auth";
+import { authConfigured, logout } from "../lib/auth";
 import { newRequestId } from "../lib/id";
 const message = (e: unknown) =>
   e instanceof Error ? e.message : "ทำรายการไม่สำเร็จ กรุณาลองใหม่";
@@ -1041,10 +1041,7 @@ export function Invite() {
                 disabled={!authConfigured || busy}
                 onClick={() => {
                   setBusy(true);
-                  void signIn("invite").catch((e) => {
-                    setError(message(e));
-                    setBusy(false);
-                  });
+                  location.assign("/login?continue=invite");
                 }}
               >
                 เข้าสู่ระบบเพื่อรับคำเชิญ

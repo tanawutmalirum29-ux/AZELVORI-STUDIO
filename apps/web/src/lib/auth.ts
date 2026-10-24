@@ -1,3 +1,4 @@
+import { clearNativeSession, hasNativeSession, logoutNative, nativeAccessToken } from "./direct-auth";
 import {
   ErrorTimeout,
   UserManager,
@@ -39,6 +40,7 @@ export function auth() {
   return manager;
 }
 export async function signIn(destination: "app" | "admin" | "invite" = "app") {
+  clearNativeSession();
   await auth().signinRedirect({ state: { destination } });
 }
 export type LoginDestination = "/admin" | "/invite" | "/app";
@@ -105,6 +107,15 @@ export function finishLogin() {
 }
 export async function logout() {
   loggingOut = true;
+  if (hasNativeSession()) {
+    sessionStorage.removeItem("azelvori:pending-invite");
+    try {
+      await logoutNative();
+      // A previous hosted-OAuth session must not silently survive native sign-out.
+      await auth().removeUser();
+    } finally { location.assign("/login"); }
+    return;
+  }
   sessionStorage.removeItem("azelvori:pending-invite");
   try {
     // A refresh may persist a new user. Finish it before removing the session.
@@ -121,6 +132,7 @@ let refreshing: Promise<string> | undefined;
 let loggingOut = false;
 export async function accessToken(): Promise<string> {
   if (loggingOut) throw new Error("กำลังออกจากระบบ");
+  if (hasNativeSession()) return nativeAccessToken();
   const user = await auth().getUser();
   if (loggingOut || !user)
     throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");

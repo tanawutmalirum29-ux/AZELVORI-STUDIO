@@ -98,7 +98,7 @@ async function provider(page: Page) {
     exchanges: () => tokenExchanges,
     async begin() {
       await page
-        .getByRole("button", { name: "เข้าสู่ระบบผู้ดูแล", exact: true })
+        .getByRole("button", { name: "เข้าสู่ระบบผ่าน Amazon Cognito", exact: true })
         .click();
       await expect(
         page.getByRole("heading", { name: "Test identity provider" }),

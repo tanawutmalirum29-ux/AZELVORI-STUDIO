@@ -58,17 +58,18 @@ describe("AWS foundation safeguards", () => {
       GenerateSecret: false,
       AllowedOAuthFlows: ["code"],
       EnableTokenRevocation: true,
+      ExplicitAuthFlows: Match.arrayWith(["ALLOW_USER_PASSWORD_AUTH", "ALLOW_USER_SRP_AUTH"]),
       AllowedOAuthScopes: Match.arrayWith(["aws.cognito.signin.user.admin"]),
     });
     template.hasResourceProperties("AWS::ApiGatewayV2::Route", {
       RouteKey: "GET /api/v1/admin/leads",
       AuthorizationType: "JWT",
-      AuthorizationScopes: ["azelvori/access"],
+      AuthorizationScopes: ["azelvori/access", "aws.cognito.signin.user.admin"],
     });
     template.hasResourceProperties("AWS::ApiGatewayV2::Route", {
       RouteKey: "GET /api/v1/admin/leads/{id}",
       AuthorizationType: "JWT",
-      AuthorizationScopes: ["azelvori/access"],
+      AuthorizationScopes: ["azelvori/access", "aws.cognito.signin.user.admin"],
     });
     template.hasOutput("AuditTable", { Value: Match.anyValue() });
     template.hasOutput("AppOrigin", { Value: options.appOrigin });
@@ -112,7 +113,7 @@ describe("AWS foundation safeguards", () => {
     expect(privateRoutes.length).toBeGreaterThanOrEqual(16);
     for (const { Properties: p } of privateRoutes) {
       expect(p.AuthorizationType).toBe("JWT");
-      expect(p.AuthorizationScopes).toEqual(["azelvori/access"]);
+      expect(p.AuthorizationScopes).toEqual(["azelvori/access", "aws.cognito.signin.user.admin"]);
     }
     const policies = Object.values(
       template.findResources("AWS::IAM::Policy"),
