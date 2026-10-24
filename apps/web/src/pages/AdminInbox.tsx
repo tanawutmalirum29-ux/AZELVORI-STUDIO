@@ -47,7 +47,7 @@ function InboxDesk({ identity, onLost }: {
   function failed(reason: unknown) {
     const message = errorText(reason);
     setError(message);
-    if (reason instanceof ApiError && (reason.status === 401 || reason.status === 403)) {
+    if (reason instanceof ApiError && ([401, 403, 404].includes(reason.status))) {
       setProjects([]);
       setMessages([]);
       setSelectedId(undefined);
