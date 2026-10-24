@@ -16,6 +16,10 @@ test("employee signs in with issued key, chats, acknowledges work and signs out"
       return route.fulfill({status:204,headers:{"Access-Control-Allow-Origin":"*",
         "Access-Control-Allow-Headers":"*","Access-Control-Allow-Methods":"POST,OPTIONS"}});
     const body = route.request().postDataJSON() as {AuthParameters?:Record<string,string>};
+    if ((route.request().headers()["x-amz-target"] ?? "").endsWith("RevokeToken")) {
+      return route.fulfill({headers:{"Access-Control-Allow-Origin":"*"},
+        contentType:"application/x-amz-json-1.1",body:"{}"});
+    }
     expect(body.AuthParameters?.USERNAME).toBe("emp-00001");
     expect(body.AuthParameters?.PASSWORD).toBe("demo-employee-strong-password");
     requests.push("cognito");
