@@ -140,7 +140,7 @@ export async function nativeAccessToken(): Promise<string> {
       stored(answer.AuthenticationResult, entry);
       return answer.AuthenticationResult.AccessToken!;
     }).catch(() => {
-      clearNativeSession();
+      if (read()?.refresh === entry.refresh) clearNativeSession();
       throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
     }).finally(() => { inFlightRefresh = undefined; });
   }
