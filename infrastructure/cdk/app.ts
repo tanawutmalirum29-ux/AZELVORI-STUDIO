@@ -324,6 +324,9 @@ export class FoundationStack extends Stack {
     new CfnOutput(this, "AuditTable", { value: audit.tableName });
     new CfnOutput(this, "AppOrigin", { value: options.appOrigin });
     new CfnOutput(this, "UserPoolId", { value: pool.userPoolId });
+    new CfnOutput(this, "IntakeEnabled", {
+      value: String(options.intakeEnabled),
+    });
   }
 }
 // Importing the stack for assertions must not synthesize a second app.

@@ -1,0 +1,79 @@
+# เปิดระบบแอดมินด้วย AWS CloudShell
+
+ใช้สำหรับเปิดระบบครั้งแรกของเว็บ **https://main.d3uhwi8blbgrci.amplifyapp.com** เท่านั้น ตัวช่วยอยู่บน GitHub `main` แล้ว แต่การมีตัวช่วยไม่ได้หมายความว่า backend หรือบัญชีของคุณถูกสร้างแล้ว ต้องรันใน AWS ของคุณก่อน
+
+## คุณต้องทำอะไร
+
+1. ลงชื่อเข้า [AWS Console](https://console.aws.amazon.com/amplify/home) ด้วยบัญชีที่ดูแลเว็บนี้ เปิด Amplify app **d3uhwi8blbgrci** แล้วจำ **Region ที่แสดงมุมขวาบน** ไม่ต้องเดาว่าเป็น Singapore
+2. เปิด **CloudShell** (ไอคอน `>_` ใน Console) ใน region เดียวกัน รอจนพิมพ์คำสั่งได้ ใช้ CloudShell ปกติที่เชื่อมอินเทอร์เน็ตได้
+3. วางคำสั่งนี้สำหรับครั้งแรก:
+
+   ```bash
+   git clone --branch main --single-branch https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO.git
+   cd AZELVORI-STUDIO
+   bash scripts/cloudshell-activate.sh
+   ```
+
+   ถ้ามีโฟลเดอร์จากครั้งก่อนแล้ว ไม่ต้อง clone ซ้ำ ใช้:
+
+   ```bash
+   cd ~/AZELVORI-STUDIO
+   git pull --ff-only origin main
+   bash scripts/cloudshell-activate.sh
+   ```
+
+4. เมื่อถามอีเมล ให้ใส่ **อีเมลของคุณที่ต้องการใช้เป็นเจ้าของสตูดิโอ** ตรวจ Account, Region, app ID, branch `main`, URL และอีเมลในแผน แล้วพิมพ์ `DEPLOY` หากถูกต้อง ทรัพยากร AWS มีค่าใช้จ่ายตามการใช้งาน ตัวช่วยยังไม่ตั้ง budget หรือเพดานค่าใช้จ่าย
+5. ถ้า CDK แสดงรายการ IAM changes และถาม `Do you wish to deploy these changes` ให้ตรวจว่าเป็น stack `Azelvori-staging` ของบัญชีนี้ แล้วพิมพ์ `y` รอจนขึ้น **เผยแพร่สำเร็จ** อย่าปิด CloudShell หรือแก้ environment variables ระหว่างทำงาน
+6. ตรวจอีเมลคำเชิญจาก Cognito รวมโฟลเดอร์ Spam เปิด [เข้าสู่ระบบผู้ดูแล](https://main.d3uhwi8blbgrci.amplifyapp.com/admin/login) ใช้อีเมลและรหัสชั่วคราวจากคำเชิญ ตั้งรหัสผ่านส่วนตัวและ Authenticator ตามหน้า Cognito เก็บรหัสและ OTP ไว้กับคุณเท่านั้น
+7. เปิด [ตรวจความพร้อม](https://main.d3uhwi8blbgrci.amplifyapp.com/admin/setup) กดทดสอบ API แล้วเข้า [คิวบรีฟ](https://main.d3uhwi8blbgrci.amplifyapp.com/admin) และ [โปรเจกต์](https://main.d3uhwi8blbgrci.amplifyapp.com/admin/projects) บัญชีใหม่อาจยังไม่มีบรีฟ คิวว่างไม่ได้แปลว่าระบบเสีย
+
+CloudShell ใช้สิทธิ์ของบัญชีที่ลงชื่อเข้า Console อยู่แล้ว **ไม่ต้องสร้างหรือส่ง Access Key มาในแชต** ต้องมีสิทธิ์ deploy ขององค์กรอยู่ก่อน หากเจอ AccessDenied ให้ผู้ดูแล AWS เพิ่มเฉพาะสิทธิ์ที่ขาดตาม error ไม่ต้องสร้าง IAM user ใหม่เพื่อเลี่ยงข้อจำกัด
+
+## ตัวช่วยทำอะไรให้
+
+- ตรวจ AWS account/region, repository, Amplify app และ branch ให้ตรงเป้าหมาย ก่อนแสดงแผน
+- เตรียม Node.js ≥22.14 และติดตั้ง dependencies ตาม lockfile หาก Node เก่า จะใช้ Node 22 จาก `nodejs.org` พร้อมตรวจ SHA-256 ในโฟลเดอร์ชั่วคราวสำหรับคำสั่งนี้ ไม่แก้ shell profile
+- ถ้ายังไม่มี backend: ตรวจ Lambda quota, สร้าง CDKToolkit เมื่อจำเป็น แล้ว deploy `Azelvori-staging` (API, Cognito, DynamoDB 2 ตาราง, logs, roles และ alarm) CDKToolkit มี bucket/roles สำหรับ deploy ด้วย
+- ถ้ามี backend แล้ว: ใช้เฉพาะ stack ที่ตรงกับเว็บและยังปิดรับบรีฟ **ไม่ deploy ทับ stack เดิม** รุ่นเก่าที่ไม่มี `IntakeEnabled` output ต้องอัปเดตตาม [คู่มือเดิม](17_ADMIN_ACTIVATION.md) ด้วย context เดิมก่อน
+- ตรวจ public API `/health` ว่ารองรับ CRM และ private workspace จากนั้นสร้าง/ตรวจบัญชีเจ้าของและสิทธิ์จริง พร้อม audit ในฐานข้อมูล
+- เติม public identifiers 6 ค่าเฉพาะ Amplify branch `main` โดยรักษาตัวแปรอื่น ไม่แสดงค่าลับที่มีอยู่ และอ่านตรวจหลังบันทึก
+- เริ่ม Amplify `RELEASE` และรอผลประมาณ 20 นาที (อาจนานกว่านี้เมื่อ AWS ตอบช้า) แจ้งสำเร็จเฉพาะเมื่อ AWS รายงาน `SUCCEED` หากหมดเวลารอ job ยังอาจทำงานอยู่
+
+การ deploy, สร้างผู้ใช้ และเผยแพร่เว็บอยู่คนละบริการ จึงไม่ใช่ transaction เดียว หากหยุดกลางทางจะไม่ลบข้อมูลย้อนกลับ รันใหม่หลังแก้สาเหตุได้ บัญชีที่มีสิทธิ์ถูกต้องแล้วไม่ถูกเชิญซ้ำ ไม่คืนสิทธิ์ให้บัญชีที่ถูกถอน และอาจเริ่ม frontend build ใหม่หนึ่งครั้ง ตัวช่วยไม่ resend รหัสชั่วคราวที่หมดอายุ
+
+## ตรวจอย่างเดียว / แก้ปัญหา
+
+```bash
+# เตรียมเครื่องและตรวจ AWS โดยไม่สร้างทรัพยากร/ผู้ใช้/แก้ Amplify
+bash scripts/cloudshell-activate.sh --check
+
+# หาก CLI ไม่ได้อ่าน region จาก CloudShell ให้แทน YOUR_REGION ด้วย region จริง
+bash scripts/cloudshell-activate.sh --region YOUR_REGION
+```
+
+| ข้อความ/อาการ | ทำต่ออย่างไร |
+|---|---|
+| App ไม่พบ / ResourceNotFound / เป้าหมายไม่ตรง | กลับ Amplify ตรวจบัญชีและ region ของ app `d3uhwi8blbgrci` แล้วเปิด CloudShell ใน region นั้น |
+| AccessDenied / Unauthorized | ให้ผู้ดูแล AWS ตรวจสิทธิ์ของ Console session นี้ตามบริการที่ปฏิเสธ |
+| Lambda concurrency ไม่พอ | ใน Service Quotas → AWS Lambda ของ region นี้ ขอเพิ่ม Concurrent executions ให้พอจอง 5 โดยเหลือ unreserved อย่างน้อย 100; อย่าแก้ quota ของงานอื่นโดยไม่ตรวจ |
+| main กำลัง build | รอ job เดิมจบใน Amplify แล้วรันคำสั่งเดิม |
+| มีค่าของระบบอื่น / IntakeEnabled output ขาด | หยุดตรวจ backend ที่ใช้อยู่ก่อน ตัวช่วยไม่เปลี่ยนปลายทางเดิมหรือปิดรับงานให้เอง |
+| CloudFormation ROLLBACK / UPDATE_IN_PROGRESS | เปิด stack → Events ดูสาเหตุหรือรอจนจบ ไม่ลบตารางหรือ stack เพื่อแก้โดยเดา |
+| CDK bootstrap เก่า / SSM bootstrap version ไม่พบ | ให้ผู้ดูแลตรวจ/อัปเกรด CDKToolkit ในบัญชีและ region เดิมก่อน ตัวช่วยไม่อัปเกรด bootstrap เดิมอัตโนมัติ |
+| Amplify FAILED | เปิด job ID ที่แสดง ดู Build logs แก้สาเหตุแล้วรันใหม่ การสร้าง backend/บัญชีที่สำเร็จแล้วจะยังอยู่ |
+| หมดเวลารอ Amplify | ดู job ID ใน Console ถ้าสำเร็จแล้วให้เปิดหน้าแอดมิน ถ้ายังรันให้รอ ไม่กด deploy ซ้ำ |
+| อีเมลไม่มา / รหัสชั่วคราวหมดอายุ | ตรวจอีเมลและ Spam, Cognito delivery status แล้วให้ผู้ดูแลส่งคำเชิญใหม่จาก user pool เดิม |
+| พื้นที่ CloudShell เต็ม / ดาวน์โหลด Node ไม่สำเร็จ | ตรวจพื้นที่และเครือข่ายของ CloudShell ก่อนรันใหม่ ตัวช่วยใช้พื้นที่ชั่วคราวสำหรับ Node/cache ไม่ลบไฟล์ส่วนตัว |
+| ลงชื่อเข้าได้แต่ไม่ใช่ผู้ดูแล | ตรวจว่าใช้อีเมลเดียวกับแผน ตรวจ staff grant ตามคู่มือ; อย่าแก้ Cognito sub เองโดยเดา |
+
+สิทธิ์ที่ใช้เพิ่มจาก `admin:setup`: อ่าน Amplify app/branch/job, `amplify:UpdateBranch`, `StartJob`, CloudFormation DescribeStacks, Lambda GetAccountSettings และสิทธิ์ CDK bootstrap/deploy ตามทรัพยากรใน template การใช้ helper ไม่เพิ่มสิทธิ์ของ Console user เอง
+
+## หลังเข้าแอดมินได้แล้ว
+
+เป้าหมายรอบนี้คือ **เปิดบัญชีผู้ดูแลและเชื่อมระบบจริงสำหรับทดสอบส่วนตัว** ตัวช่วยยังไม่เปิดรับบรีฟสาธารณะ ไม่ยืนยันข้อมูลธุรกิจ/นโยบายแทนเจ้าของ และไม่ส่งข้อความตอบลูกค้าอัตโนมัติ
+
+ทดสอบ login/MFA, logout, เปิดหน้าใหม่และสิทธิ์ผู้ดูแลก่อน จากนั้นทำตาม [เริ่มรับบรีฟและคุมงาน](17_ADMIN_ACTIVATION.md#เริ่มรับบรีฟและคุมงาน): ยืนยันข้อมูลธุรกิจ/นโยบาย, budget/การแจ้งเตือน, backup และทดสอบข้อมูลสมมติครบวงจร ก่อนเปิด intake ทั้ง backend และ frontend
+
+การทดสอบอัตโนมัติของตัวช่วยใช้ AWS responses จำลองและ CDK synth ไม่ใช่หลักฐานว่า deploy หรือล็อกอินในบัญชี AWS จริงสำเร็จ ต้องตรวจผลจริงจาก CloudShell/Amplify และการเข้าใช้งานของคุณ
+
+อ้างอิงทางการ: [CloudShell และ credentials](https://docs.aws.amazon.com/cloudshell/latest/userguide/welcome.html), [CloudShell software/พื้นที่](https://docs.aws.amazon.com/cloudshell/latest/userguide/vm-specs.html), [CDK bootstrap](https://docs.aws.amazon.com/cdk/v2/guide/bootstrapping-env.html), [Amplify UpdateBranch](https://docs.aws.amazon.com/cli/latest/reference/amplify/update-branch.html), [Amplify StartJob](https://docs.aws.amazon.com/cli/latest/reference/amplify/start-job.html), [Node.js release checksums](https://nodejs.org/dist/latest-v22.x/SHASUMS256.txt).

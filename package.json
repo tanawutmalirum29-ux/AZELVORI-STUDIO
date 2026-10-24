@@ -17,6 +17,7 @@
     "build": "npm run typecheck && vite build --config apps/web/vite.config.ts && node scripts/build-api.mjs",
     "typecheck": "tsc --noEmit",
     "admin:setup": "node --import tsx scripts/admin-setup.ts",
+    "activate": "node --import tsx scripts/activate.ts",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:workspace": "playwright test --config playwright.workspace.config.ts",

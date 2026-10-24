@@ -5,7 +5,8 @@
 
 **สถานะ:** Private Workspace Alpha — มีเว็บไซต์, Lead API, CRM, คำเชิญลูกค้า, โปรเจกต์ส่วนตัว, ข้อความและการตรวจรับ milestone ใน source แล้ว; ยังไม่เปิดบริการจริง
 
-**อัปเดตแผน:** 23 ตุลาคม 2026  
+**อัปเดตแผน:** 24 ตุลาคม 2026
+
 **ภาษาเริ่มต้น:** ไทย รองรับอังกฤษในระยะถัดไป  
 **หลักการ:** AWS-first / Customer-first / Privacy by design / Human-approved AI
 
@@ -14,6 +15,8 @@ AZELVORI STUDIO คือแพลตฟอร์มธุรกิจรับ�
 > ย่อหน้าข้างต้นคือเป้าหมายผลิตภัณฑ์ โค้ดข้อความส่วนตัวบันทึกผ่าน backend และตรวจข้อความใหม่ทุก 15 วินาที; ยังไม่ได้ยืนยันบน AWS จริง ระบบชำระเงิน ไฟล์ พรีวิวแยกโดเมน และ AI runner ยังไม่เปิดใช้งาน ดูสถานะรายฟีเจอร์ที่ [Implementation Status](docs/10_IMPLEMENTATION_STATUS.md)
 
 ## เริ่มรันโค้ด
+
+**ต้องการเปิดบัญชีแอดมินบนเว็บ Amplify:** เริ่มที่ [คู่มือ CloudShell ภาษาไทย](docs/19_CLOUDSHELL_QUICKSTART.md) เปิด CloudShell ในบัญชีและ region ของ app `d3uhwi8blbgrci` แล้วรัน `bash scripts/cloudshell-activate.sh` จาก checkout ของ `main` ที่ไม่มีการแก้ไขค้าง ตัวช่วยตรวจเป้าหมาย เตรียม backend/บัญชี และเชื่อม Amplify ให้หลังยืนยันแผน ส่วน `--check` ตรวจ AWS อย่างเดียว ยังไม่เปิดรับบรีฟสาธารณะ
 
 ใช้ Node.js 22.14 ขึ้นไป และ npm:
 
@@ -74,7 +77,7 @@ npm run test:e2e:workspace
 ## ลำดับเริ่มทำงาน
 **Phase 0** รวบรวมธุรกิจ/ความเสี่ยง → **Phase 1** เว็บไซต์ + Identity + CRM → **Phase 2** Customer Portal + Chat → **Phase 3** Quotes/Payments/Preview → **Phase 4** AI-assisted workflow → **Phase 5** Beta/Pilot → **Phase 6** Scale.
 
-**ความหมายสถานะ:** เอกสาร 00–09 เป็น planning baseline; เอกสาร 10–16 และ ADR แสดงขอบเขต implementation, วิธีรัน และผลตรวจจริง ห้ามถือว่าทุกรายการใน roadmap เสร็จเพียงเพราะมีโค้ดบางส่วน
+**ความหมายสถานะ:** เอกสาร 00–09 เป็น planning baseline; เอกสาร 10–19 และ ADR แสดงขอบเขต implementation, วิธีรัน และผลตรวจจริง ห้ามถือว่าทุกรายการใน roadmap เสร็จเพียงเพราะมีโค้ดบางส่วน
 
 ## ที่มา/อ้างอิง
 ดูแหล่งข้อมูลบริการ AWS, Stripe และข้อกฎหมายที่ต้องตรวจยืนยันใน [06_SECURITY_LEGAL](docs/06_SECURITY_LEGAL.md) และ [03_AWS_ARCHITECTURE](docs/03_AWS_ARCHITECTURE.md).

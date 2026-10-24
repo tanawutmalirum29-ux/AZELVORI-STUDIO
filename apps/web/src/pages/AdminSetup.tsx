@@ -116,18 +116,20 @@ export function AdminSetup() {
           <h2>เริ่มใช้งาน 3 ขั้นตอน</h2>
           <ol className="setup-steps">
             <li>
-              <strong>เชื่อมระบบ AWS</strong>
+              <strong>เปิด CloudShell ในบัญชี AWS ของคุณ</strong>
               <p>
-                เผยแพร่ backend โดยใช้ที่อยู่เว็บนี้เป็น App origin แล้วนำค่าจาก
-                Stack outputs ใส่ Environment variables ของ Amplify
-                และเผยแพร่เว็บอีกครั้ง
+                เปิด Amplify app ของเว็บนี้ แล้วเลือก CloudShell ใน Region
+                เดียวกัน ทำตามคู่มือด้านล่างเพื่อเริ่มตัวช่วยตั้งค่า ไม่ต้องส่ง
+                Access Key หรือรหัสผ่านให้ใคร
               </p>
             </li>
             <li>
-              <strong>สร้างบัญชีเจ้าของสตูดิโอ</strong>
+              <strong>ระบุอีเมลและตรวจแผนก่อนเริ่ม</strong>
               <p>
-                ผู้ดูแล AWS ใช้คำสั่ง admin:setup ตามคู่มือเพื่อสร้างบัญชี
-                Cognito และสิทธิ์ FOUNDER_ADMIN ระบบส่งคำเชิญไปยังอีเมลที่ระบุ
+                ตัวช่วยจะสร้างระบบ บัญชีเจ้าของ
+                และเชื่อมเว็บให้ตามแผนที่คุณยืนยัน รอจนเผยแพร่สำเร็จ
+                แล้วตรวจอีเมลคำเชิญ ขั้นตอนนี้มีค่าใช้จ่าย AWS
+                ตามการใช้งานและยังปิดรับบรีฟสาธารณะ
               </p>
             </li>
             <li>
@@ -144,11 +146,11 @@ export function AdminSetup() {
           </a>
           <a
             className="text-link"
-            href="https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/blob/main/docs/17_ADMIN_ACTIVATION.md"
+            href="https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/blob/main/docs/19_CLOUDSHELL_QUICKSTART.md"
             target="_blank"
             rel="noopener noreferrer"
           >
-            คู่มือตั้งค่าและคำสั่งสำหรับผู้ดูแล AWS ↗
+            เปิดคู่มือ CloudShell — เริ่มจากตรงนี้ ↗
           </a>
         </section>
       </div>

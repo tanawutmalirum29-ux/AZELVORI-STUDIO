@@ -18,6 +18,8 @@
 
 ## ตั้งครั้งเดียวใน AWS
 
+**ทางเริ่มที่แนะนำ:** ใช้ [คู่มือ CloudShell แบบนำทาง](19_CLOUDSHELL_QUICKSTART.md) และ `bash scripts/cloudshell-activate.sh` ตัวช่วยเตรียม Node, ตรวจบัญชี/region, สร้าง backend ที่ยังไม่มี, สร้างบัญชีเจ้าของ, เติมค่า Amplify main และรอ build ให้ในลำดับเดียว ขั้นตอน manual ด้านล่างยังใช้เมื่อมี stack เดิมหรือจำเป็นต้องตั้งค่าแยกส่วน
+
 ใช้ AWS CloudShell หรือเครื่องของผู้ดูแลที่มี AWS CLI v2, Node.js >=22.14 และบัญชี AWS/SSO ที่ได้รับสิทธิ์อยู่แล้ว ห้ามส่ง access key, secret key, รหัสผ่าน หรือ OTP ในแชตหรือ commit ลง GitHub
 
 ตัวอย่างด้านล่างเลือก `ap-southeast-1` สำหรับ **backend staging**; ตรวจว่าเป็น region ที่คุณตั้งใจใช้ก่อนรัน ไม่ใช่การยืนยัน region ของ Amplify ที่มีอยู่ การ deploy สร้างทรัพยากรที่อาจมีค่าใช้จ่าย ให้ตรวจรายการ CDK ก่อนยืนยัน

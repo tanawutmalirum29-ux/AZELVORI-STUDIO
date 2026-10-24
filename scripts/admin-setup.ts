@@ -1,8 +1,10 @@
 /** Operator-only CLI. Never imported by the browser or Lambda. No default AWS target. */
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { z } from "zod";
 
 const OptionsSchema = z
@@ -56,14 +58,24 @@ export type AwsCall = (
   operation: string,
   input: Record<string, unknown>,
 ) => Promise<AwsResult>;
-class AwsFailure extends Error {
-  constructor(public code: string) {
-    super(`AWS operation failed: ${code}`);
+export class AwsFailure extends Error {
+  constructor(
+    public code: string,
+    operation?: string,
+  ) {
+    super(`AWS operation failed: ${code}${operation ? ` (${operation})` : ""}`);
   }
 }
-export function awsCli(options: SetupOptions): AwsCall {
+export function awsCli(
+  options: Pick<SetupOptions, "region" | "profile">,
+): AwsCall {
   return async (service, operation, input) => {
+    // Amplify inputs may contain existing private environment variables. Keep them
+    // out of process arguments and logs, and remove the owner-only file on exit.
+    const directory = mkdtempSync(join(tmpdir(), "azelvori-aws-"));
     try {
+      const request = join(directory, "request.json");
+      writeFileSync(request, JSON.stringify(input), { mode: 0o600 });
       const result = execFileSync(
         "aws",
         [
@@ -80,7 +92,7 @@ export function awsCli(options: SetupOptions): AwsCall {
           "--cli-read-timeout",
           "30",
           "--cli-input-json",
-          JSON.stringify(input),
+          `file://${request}`,
         ],
         {
           encoding: "utf8",
@@ -92,11 +104,26 @@ export function awsCli(options: SetupOptions): AwsCall {
       return result.trim() ? JSON.parse(result) : {};
     } catch (e) {
       const stderr = (e as { stderr?: string }).stderr ?? "";
-      // Print only an allowlisted error code, never provider output or credential details.
-      const code = /\((\w+(?:Exception|Denied|NotFound))\)/.exec(
+      // Print only the machine error code, never provider output or credentials.
+      const code = /An error occurred \(([A-Za-z][A-Za-z0-9]+)\)/.exec(
         String(stderr),
       )?.[1];
-      throw new AwsFailure(code ?? "CHECK_AWS_CLI_PROFILE_AND_PERMISSIONS");
+      if (
+        service === "cloudformation" &&
+        operation === "describe-stacks" &&
+        code === "ValidationError" &&
+        typeof input.StackName === "string" &&
+        String(stderr).includes(
+          `Stack with id ${input.StackName} does not exist`,
+        )
+      )
+        throw new AwsFailure("StackNotFound");
+      throw new AwsFailure(
+        code ?? "CHECK_AWS_CLI_PROFILE_AND_PERMISSIONS",
+        `${service}/${operation}`,
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
     }
   };
 }

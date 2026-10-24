@@ -63,6 +63,7 @@ describe("AWS foundation safeguards", () => {
     });
     template.hasOutput("AuditTable", { Value: Match.anyValue() });
     template.hasOutput("AppOrigin", { Value: options.appOrigin });
+    template.hasOutput("IntakeEnabled", { Value: "false" });
     template.hasResourceProperties("AWS::ApiGatewayV2::Route", {
       RouteKey: "POST /api/v1/leads",
       AuthorizationType: "NONE",
