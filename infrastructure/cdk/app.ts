@@ -122,6 +122,26 @@ export class FoundationStack extends Stack {
       deletionProtection: true,
       removalPolicy: RemovalPolicy.RETAIN,
     });
+    // Completely separate employee identity boundary. Existing founder/customer pool unchanged.
+    const employeePool = new cognito.UserPool(this, "EmployeeIdentity", {
+      selfSignUpEnabled: false,
+      signInAliases: { username: true },
+      accountRecovery: cognito.AccountRecovery.ADMIN_ONLY,
+      mfa: cognito.Mfa.OFF,
+      passwordPolicy: { minLength: 12, requireDigits: true, requireLowercase: true,
+        requireUppercase: true, requireSymbols: false },
+      deletionProtection: true,
+      removalPolicy: RemovalPolicy.RETAIN,
+    });
+    const employeeClient = employeePool.addClient("EmployeeWebClient", {
+      generateSecret: false,
+      authFlows: { userPassword: true },
+      enableTokenRevocation: true,
+      preventUserExistenceErrors: true,
+      accessTokenValidity: Duration.minutes(5),
+      idTokenValidity: Duration.minutes(5),
+      refreshTokenValidity: Duration.hours(8),
+    });
     const scopeAccess = new cognito.ResourceServerScope({
       scopeName: "access",
       scopeDescription:
@@ -178,6 +198,8 @@ export class FoundationStack extends Stack {
         APP_ORIGIN: options.appOrigin,
         INTAKE_ENABLED: String(options.intakeEnabled),
         USER_POOL_ID: pool.userPoolId,
+        EMPLOYEE_POOL_ID: employeePool.userPoolId,
+        EMPLOYEE_CLIENT_ID: employeeClient.userPoolClientId,
       },
     });
     // Audit: PutItem only. The runtime cannot alter or delete historical audit events.
@@ -205,6 +227,10 @@ export class FoundationStack extends Stack {
         resources: [pool.userPoolArn],
       }),
     );
+    fn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ["cognito-idp:AdminCreateUser", "cognito-idp:AdminSetUserPassword", "cognito-idp:AdminDisableUser"],
+      resources: [employeePool.userPoolArn],
+    }));
     const api = new apigateway.HttpApi(this, "HttpApi", {
       corsPreflight: {
         allowOrigins: [options.appOrigin],
@@ -231,6 +257,38 @@ export class FoundationStack extends Stack {
     const jwt = new authorizers.HttpJwtAuthorizer("CognitoJwt", issuer, {
       jwtAudience: [client.userPoolClientId],
     });
+    const employeeJwt = new authorizers.HttpJwtAuthorizer("EmployeeCognitoJwt",
+      "https://cognito-idp." + this.region + "." + this.urlSuffix + "/" + employeePool.userPoolId, {
+        jwtAudience: [employeeClient.userPoolClientId],
+      });
+    api.addRoutes({
+      path: "/api/v1/employee/config",
+      methods: [apigateway.HttpMethod.GET],
+      integration,
+    });
+    api.addRoutes({
+      path: "/api/v1/admin/employees",
+      methods: [apigateway.HttpMethod.GET, apigateway.HttpMethod.POST],
+      integration, authorizer: jwt,
+      authorizationScopes: ["azelvori/access", "aws.cognito.signin.user.admin"],
+    });
+    api.addRoutes({
+      path: "/api/v1/admin/employees/{key}/revoke",
+      methods: [apigateway.HttpMethod.POST],
+      integration, authorizer: jwt,
+      authorizationScopes: ["azelvori/access", "aws.cognito.signin.user.admin"],
+    });
+    for (const [staffPath, methods] of [
+      ["/api/v1/employee/me", [apigateway.HttpMethod.GET]],
+      ["/api/v1/employee/projects", [apigateway.HttpMethod.GET]],
+      ["/api/v1/employee/projects/{id}/messages",
+        [apigateway.HttpMethod.GET, apigateway.HttpMethod.POST]],
+    ] as [string, apigateway.HttpMethod[]][]) {
+      api.addRoutes({
+        path: staffPath, methods, integration, authorizer: employeeJwt,
+        authorizationScopes: ["aws.cognito.signin.user.admin"],
+      });
+    }
     api.addRoutes({
       path: "/health",
       methods: [apigateway.HttpMethod.GET],
@@ -351,6 +409,8 @@ export class FoundationStack extends Stack {
     new CfnOutput(this, "AuditTable", { value: audit.tableName });
     new CfnOutput(this, "AppOrigin", { value: options.appOrigin });
     new CfnOutput(this, "UserPoolId", { value: pool.userPoolId });
+    new CfnOutput(this, "EmployeePoolId", { value: employeePool.userPoolId });
+    new CfnOutput(this, "EmployeeClientId", { value: employeeClient.userPoolClientId });
     new CfnOutput(this, "IntakeEnabled", {
       value: String(options.intakeEnabled),
     });
