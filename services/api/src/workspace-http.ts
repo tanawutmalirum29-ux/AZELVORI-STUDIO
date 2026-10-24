@@ -1,6 +1,7 @@
 import type { APIGatewayProxyEventV2 } from "aws-lambda";
 import { ProjectIdSchema } from "@azelvori/contracts";
 import { HttpError } from "./domain";
+import { hasValidatedAccessClaims } from "./access-claims";
 import { parseBody } from "./request";
 import type { WorkspaceService } from "./workspace";
 export async function workspaceRoute(
@@ -19,12 +20,7 @@ export async function workspaceRoute(
       authorizer?: { jwt?: { claims?: Record<string, unknown> } };
     }
   ).authorizer?.jwt?.claims;
-  if (
-    typeof claims?.sub !== "string" ||
-    claims.token_use !== "access" ||
-    typeof claims.scope !== "string" ||
-    !claims.scope.split(" ").includes("azelvori/access")
-  )
+  if (!hasValidatedAccessClaims(claims))
     throw new HttpError(401, "UNAUTHENTICATED", "กรุณาเข้าสู่ระบบใหม่");
   const actor = {
     sub: claims.sub,
