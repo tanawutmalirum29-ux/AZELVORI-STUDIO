@@ -40,7 +40,7 @@ function InboxDesk({ identity, onLost }: {
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const drafts = useRef(new Map<string, string>());
-  const pending = useRef<{ id: string; text: string; key: string }>();
+  const pending = useRef<{ id: string; text: string; key: string } | undefined>(undefined);
   const sendLock = useRef(false);
   const pollLock = useRef(false);
 
