@@ -126,7 +126,6 @@ export class FoundationStack extends Stack {
     const employeePool = new cognito.UserPool(this, "EmployeeIdentity", {
       selfSignUpEnabled: false,
       signInAliases: { username: true },
-      accountRecovery: cognito.AccountRecovery.ADMIN_ONLY,
       mfa: cognito.Mfa.OFF,
       passwordPolicy: { minLength: 12, requireDigits: true, requireLowercase: true,
         requireUppercase: true, requireSymbols: false },
