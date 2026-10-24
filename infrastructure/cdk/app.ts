@@ -135,7 +135,8 @@ export class FoundationStack extends Stack {
       generateSecret: false,
       preventUserExistenceErrors: true,
       enableTokenRevocation: true,
-      authFlows: { userSrp: true },
+      // A first-party form uses USER_PASSWORD_AUTH; retain SRP and OAuth redirect as fallback.
+      authFlows: { userSrp: true, userPassword: true },
       accessTokenValidity: Duration.minutes(5),
       idTokenValidity: Duration.minutes(5),
       refreshTokenValidity: Duration.hours(8),
@@ -245,14 +246,20 @@ export class FoundationStack extends Stack {
       methods: [apigateway.HttpMethod.GET],
       integration,
       authorizer: jwt,
-      authorizationScopes: ["azelvori/access"],
+      // OAuth hosted sign-in supplies azelvori/access. Native Cognito
+      // InitiateAuth supplies only aws.cognito.signin.user.admin; both are
+      // JWT-authorized here, with staff/project permissions enforced in Lambda.
+      authorizationScopes: ["azelvori/access", "aws.cognito.signin.user.admin"],
     });
     api.addRoutes({
       path: "/api/v1/admin/leads/{id}",
       methods: [apigateway.HttpMethod.GET, apigateway.HttpMethod.PATCH],
       integration,
       authorizer: jwt,
-      authorizationScopes: ["azelvori/access"],
+      // OAuth hosted sign-in supplies azelvori/access. Native Cognito
+      // InitiateAuth supplies only aws.cognito.signin.user.admin; both are
+      // JWT-authorized here, with staff/project permissions enforced in Lambda.
+      authorizationScopes: ["azelvori/access", "aws.cognito.signin.user.admin"],
     });
     for (const [path, methods] of [
       ["/api/v1/me", [apigateway.HttpMethod.GET]],
@@ -287,7 +294,10 @@ export class FoundationStack extends Stack {
         methods,
         integration,
         authorizer: jwt,
-        authorizationScopes: ["azelvori/access"],
+        // OAuth hosted sign-in supplies azelvori/access. Native Cognito
+      // InitiateAuth supplies only aws.cognito.signin.user.admin; both are
+      // JWT-authorized here, with staff/project permissions enforced in Lambda.
+      authorizationScopes: ["azelvori/access", "aws.cognito.signin.user.admin"],
       });
     const accessLogs = new logs.LogGroup(this, "AccessLogs", {
       retention: logs.RetentionDays.ONE_MONTH,
