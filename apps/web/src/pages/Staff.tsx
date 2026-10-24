@@ -90,7 +90,7 @@ export function StaffInbox() {
   const [leadCursor, setLeadCursor] = useState<string>();
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
-  const pending = useRef<{ key: string; text: string; project: string }>();
+  const pending = useRef<{ key: string; text: string; project: string } | undefined>(undefined);
   const lock = useRef(false);
   function handleError(err: unknown) {
     if ((err as ApiError)?.status === 403 || (err as ApiError)?.status === 401) {
