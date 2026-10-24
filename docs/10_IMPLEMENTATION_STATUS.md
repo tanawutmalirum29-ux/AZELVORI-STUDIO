@@ -1,6 +1,6 @@
 # Implementation status — Studio admin desk alpha
 
-Updated after the studio admin desk increment; see [admin activation](17_ADMIN_ACTIVATION.md). This file describes actual code; the master plan describes the intended final service.
+Updated after the guided CloudShell activation increment; start with the [Thai CloudShell quick start](19_CLOUDSHELL_QUICKSTART.md), or use [manual admin activation](17_ADMIN_ACTIVATION.md) for an existing deployment. This file describes actual code; the master plan describes the intended final service.
 
 ## Implemented in source
 
@@ -20,7 +20,8 @@ Updated after the studio admin desk increment; see [admin activation](17_ADMIN_A
 | Portal demo | Overview, milestone-derived progress, device preview, version-pinned sample comments/approval, escaped chat, file/scope examples | Public synthetic content; memory only; no realtime/customer data |
 | AWS source | Cognito, Lambda, HTTP API, two DynamoDB tables, PITR/retention, logs, alarm, optional monthly budget | Synthesized locally; no cloud resources created in this task |
 | Amplify source | Build config, security headers, SPA rewrite config, bundled fonts | Frontend is observed on the supplied Amplify domain; Cognito/API/intake build settings are still absent there |
-| QA | Contracts, HTTP/domain integration, Dynamo command contracts, infrastructure assertions, browser matrix in CI | 135 tests and 140 browser cases passed; [admin desk QA evidence](18_QA_ADMIN_DESK.md) distinguishes mocks/local/CI/live AWS |
+| Guided activation | CloudShell launcher prepares Node/dependencies; operator reviews account/region/app/email before backend creation, audited founder provisioning, branch env merge and Amplify release polling | Only the supplied app/main and closed staging; existing stacks are validated and reused, never redeployed by the wizard. Owner must run it in their AWS session; real provisioning/login remains unverified |
+| QA | Contracts, HTTP/domain integration, Dynamo command contracts, infrastructure assertions, activation/secret transport tests, browser matrix in CI | 158 tests and 140 browser cases passed on `6574a56`; [activation evidence](19_CLOUDSHELL_QUICKSTART.md) distinguishes mocks/local/CI/live AWS |
 
 ## Requirement mapping
 
@@ -44,7 +45,7 @@ Updated after the studio admin desk increment; see [admin activation](17_ADMIN_A
 
 ## Next concrete increment
 
-1. Use the [activation guide](17_ADMIN_ACTIVATION.md) to deploy staging for the supplied Amplify origin, provision the first founder, set frontend variables and redeploy. AWS account/region, budget and truthful legal contact remain operator decisions.
+1. Run `bash scripts/cloudshell-activate.sh` using the [CloudShell guide](19_CLOUDSHELL_QUICKSTART.md) in the app's AWS account/region. This prepares staging, the first founder and Amplify settings after operator review; use `--check` for read-only AWS checks. Budget and truthful legal contact remain operator decisions.
 2. Verify actual hosted login/logout/MFA and staff revocation; test Dynamo transaction/rate semantics in staging.
 3. Run the [private workspace staging checklist](15_PRIVATE_WORKSPACE_PILOT.md) with two synthetic customers; source tests already cover A/B denial, invitation lifecycle and revocation races.
 4. Add private S3 quarantine/download grants and immutable deliverable/preview versions. Expand milestone scope, owners and deadlines.

@@ -76,4 +76,16 @@ bash scripts/cloudshell-activate.sh --region YOUR_REGION
 
 การทดสอบอัตโนมัติของตัวช่วยใช้ AWS responses จำลองและ CDK synth ไม่ใช่หลักฐานว่า deploy หรือล็อกอินในบัญชี AWS จริงสำเร็จ ต้องตรวจผลจริงจาก CloudShell/Amplify และการเข้าใช้งานของคุณ
 
+## ผลตรวจรุ่นนี้ — 24 ตุลาคม 2026
+
+[GitHub Actions run 40052823650](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/actions/runs/40052823650) บน source commit `6574a56248d9d922480de185bac7a6ae0c28a98b` ผ่านทั้งหมด:
+
+- Unit/integration/operator tests **158 รายการ / 14 ไฟล์** รวมการหยุดเมื่อผิดบัญชี/แอป/branch/quota, ค่า env เปลี่ยนระหว่างยืนยัน, สิทธิ์ถูกถอน, health/build ล้มเหลว, timeout และการรันต่อโดยไม่เชิญผู้ใช้ซ้ำ
+- Browser **140 กรณี**: public 60 + private workspace 80 บน Chromium/WebKit × 5 ขนาดจอ ผ่าน accessibility/overflow checks ที่กำหนดในชุดทดสอบ ตรวจภาพหน้า setup ขนาด 320×568 แล้ว
+- Build/typecheck, hosting preflight, CDK synth และ dependency audit ผ่าน; audit รายงาน **0 vulnerabilities** ณ เวลาที่ตรวจ
+- ตรวจ syntax ของ launcher และทดสอบ CLI แบบโต้ตอบ (ใส่อีเมล → อ่านแผน → ยกเลิก) กับ `--check` ผ่าน AWS CLI จำลอง ไม่มี cloud writes
+- ตรวจเว็บ Amplify จริงแล้ว: หน้า setup แสดงคู่มือ CloudShell ใหม่ และหน้า login ยังแจ้งว่ายังไม่ได้เชื่อม Cognito/API จึงยังไม่อ้างว่าสร้างบัญชีหรือเปิดระบบจริงสำเร็จ
+
+หลักฐาน CI artifact `12544201539` เก็บรายงาน/ภาพ/template ถึง **7 พฤศจิกายน 2026** ตาม retention ของ workflow; ไม่ใช่ backup ของข้อมูลธุรกิจ
+
 อ้างอิงทางการ: [CloudShell และ credentials](https://docs.aws.amazon.com/cloudshell/latest/userguide/welcome.html), [CloudShell software/พื้นที่](https://docs.aws.amazon.com/cloudshell/latest/userguide/vm-specs.html), [CDK bootstrap](https://docs.aws.amazon.com/cdk/v2/guide/bootstrapping-env.html), [Amplify UpdateBranch](https://docs.aws.amazon.com/cli/latest/reference/amplify/update-branch.html), [Amplify StartJob](https://docs.aws.amazon.com/cli/latest/reference/amplify/start-job.html), [Node.js release checksums](https://nodejs.org/dist/latest-v22.x/SHASUMS256.txt).
