@@ -49,7 +49,7 @@ export async function employeeLogin(key: string, password: string) {
   const auth = result.AuthenticationResult;
   sessionStorage.setItem(SESSION_KEY, JSON.stringify({
     access: auth.AccessToken, refresh: auth.RefreshToken,
-    expiresAt: Date.now() + auth.ExpiresIn * 1000,
+    expiresAt: Date.now() + (auth.ExpiresIn ?? 0) * 1000,
   }));
 }
 export async function employeeAccessToken(): Promise<string> {
