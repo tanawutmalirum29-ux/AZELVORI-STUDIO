@@ -1041,10 +1041,7 @@ export function Invite() {
                 disabled={!authConfigured || busy}
                 onClick={() => {
                   setBusy(true);
-                  void signIn("invite").catch((e) => {
-                    setError(message(e));
-                    setBusy(false);
-                  });
+                  location.assign("/login?continue=invite");
                 }}
               >
                 เข้าสู่ระบบเพื่อรับคำเชิญ
