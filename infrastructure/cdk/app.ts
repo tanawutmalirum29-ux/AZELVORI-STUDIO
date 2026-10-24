@@ -281,6 +281,8 @@ export class FoundationStack extends Stack {
     for (const [staffPath, methods] of [
       ["/api/v1/employee/me", [apigateway.HttpMethod.GET]],
       ["/api/v1/employee/projects", [apigateway.HttpMethod.GET]],
+      ["/api/v1/employee/leads", [apigateway.HttpMethod.GET]],
+      ["/api/v1/employee/leads/{id}/acknowledge", [apigateway.HttpMethod.POST]],
       ["/api/v1/employee/projects/{id}/messages",
         [apigateway.HttpMethod.GET, apigateway.HttpMethod.POST]],
     ] as [string, apigateway.HttpMethod[]][]) {
