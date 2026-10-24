@@ -1,5 +1,7 @@
 import { parseBody } from "./request";
 import { workspaceRoute } from "./workspace-http";
+import { employeeRoute } from "./employee-http";
+import type { EmployeeService } from "./employees";
 import { hasValidatedAccessClaims } from "./access-claims";
 import type { WorkspaceService } from "./workspace";
 import type {
@@ -20,6 +22,8 @@ export type ApiConfig = {
   intakeEnabled: boolean;
   allowedOrigin: string;
   workspace?: WorkspaceService;
+  employees?: EmployeeService;
+  employeeConfig?: { poolId: string; clientId: string; region: string };
 };
 export function createHandler(repo: Repository, config: ApiConfig) {
   return async (
@@ -51,6 +55,8 @@ export function createHandler(repo: Repository, config: ApiConfig) {
           capabilities: ["crm-follow-up", "private-workspace"],
           intakeEnabled: config.intakeEnabled,
         });
+      if (path === "/api/v1/employee/config" && method === "GET" && config.employeeConfig)
+        return respond(200, config.employeeConfig);
       if (path === "/api/v1/leads" && method === "POST") {
         if (!config.intakeEnabled)
           throw new HttpError(
@@ -84,6 +90,10 @@ export function createHandler(repo: Repository, config: ApiConfig) {
         );
       }
       if (config.workspace) {
+        if (config.employees) {
+          const employeeResponse = await employeeRoute(event, config.employees, config.workspace);
+          if (employeeResponse) return respond(employeeResponse.status, employeeResponse.body);
+        }
         const response = await workspaceRoute(event, config.workspace);
         if (response) return respond(response.status, response.body);
       }
