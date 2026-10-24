@@ -310,7 +310,7 @@ test("founder inbox polls incoming customer messages and clears data after revok
   await expect(page.getByText("ข้อความใหม่จากลูกค้า", { exact: true })).toBeVisible();
   state.revoked = true;
   await page.clock.fastForward(16000);
-  await expect(page.getByRole("link", { name: "เข้าสู่ระบบผู้ดูแล", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "เข้าสู่ระบบผู้ดูแล", exact: true })).toBeVisible();
   await expect(page.getByText("ข้อความใหม่จากลูกค้า", { exact: true })).toHaveCount(0);
 });
 
