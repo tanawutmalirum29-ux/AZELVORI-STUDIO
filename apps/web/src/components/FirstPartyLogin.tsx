@@ -167,7 +167,7 @@ export function FirstPartyLogin({ mode, denied = false, reason = "" }: {
         alt="AZELVORI STUDIO" width="245" height="55" />
       <div className="first-party-intro">
         <span className="eyebrow">{mode === "admin" ? "STUDIO CONTROL CENTER" : "PRIVATE CLIENT PORTAL"}</span>
-        <h2>{denied ? "บัญชีนี้ไม่มีสิทธิ์ผู้ดูแล"
+        <h2>{denied ? "บัญชีนี้ยังไม่มีสิทธิ์ผู้ดูแล"
           : view === "forgot" ? "กู้คืนรหัสผ่าน"
           : view === "reset" ? "ตั้งรหัสผ่านใหม่"
           : view === "challenge" ? step?.kind === "setup" ? "ตั้งค่า Authenticator"
