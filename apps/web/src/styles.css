@@ -5012,3 +5012,51 @@ dd {
     padding: 10px 12px;
   }
 }
+
+
+/* Founder Inbox: keep the conversation usable at 320px and on short landscape screens. */
+.inbox-page { padding-block: 42px 72px; }
+.inbox-heading { display: flex; justify-content: space-between; flex-wrap: wrap; align-items: start; gap: 16px; }
+.inbox-heading-actions { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.inbox-grid { display: grid; grid-template-columns: minmax(240px, 330px) minmax(0, 1fr); gap: 16px; margin-top: 20px; min-width: 0; }
+.inbox-sidebar, .inbox-thread { border: 1px solid var(--line); background: var(--surface); border-radius: var(--radius); min-width: 0; }
+.inbox-sidebar { padding: 18px; }
+.inbox-sidebar-top { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.inbox-sidebar h2, .inbox-thread h2 { font-size: 20px; }
+.inbox-project-list { display: flex; flex-direction: column; gap: 7px; margin-top: 14px; max-height: min(60vh, 620px); overflow-y: auto; }
+.inbox-project { display: flex; flex-direction: column; gap: 3px; text-align: left; width: 100%; min-width: 0; padding: 11px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg); color: inherit; }
+.inbox-project:hover, .inbox-project.active { border-color: var(--accent); }
+.inbox-project.active { background: #20322f; }
+.inbox-project strong, .inbox-project span, .inbox-project small { display: block; overflow-wrap: anywhere; }
+.inbox-project span, .inbox-project small { color: var(--muted); font-size: 12px; }
+.inbox-more { margin-top: 12px; width: 100%; }
+.inbox-side-note { margin-top: 14px; font-size: 12px; }
+.inbox-thread { display: flex; flex-direction: column; min-height: 480px; }
+.inbox-thread-top { padding: 18px; display: flex; flex-wrap: wrap; align-items: start; gap: 12px; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.inbox-thread-top h2 { overflow-wrap: anywhere; }
+.inbox-thread-tools { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; padding: 8px 18px; gap: 8px; }
+.inbox-messages { padding: 20px 18px; min-height: 220px; max-height: 57vh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.inbox-bubble { max-width: min(85%, 540px); align-self: flex-start; border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; background: #222831; min-width: 0; }
+.inbox-bubble.own { align-self: flex-end; background: #203631; border-color: #3b6860; }
+.inbox-bubble header { display: flex; gap: 10px; flex-wrap: wrap; justify-content: space-between; align-items: baseline; }
+.inbox-bubble header strong { font-size: 13px; }
+.inbox-bubble time { color: var(--muted); font-size: 12px; }
+.inbox-bubble p { overflow-wrap: anywhere; white-space: pre-wrap; color: inherit; }
+.inbox-compose { margin-top: auto; border-top: 1px solid var(--line); padding: 18px; }
+.inbox-compose textarea { width: 100%; resize: vertical; min-height: 88px; }
+.inbox-compose-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
+.inbox-empty { padding: 40px 22px; display: flex; flex-direction: column; align-items: start; gap: 14px; }
+@media (max-width: 720px) {
+  .inbox-page { padding-block: 24px 48px; }
+  .inbox-grid { grid-template-columns: minmax(0, 1fr); }
+  .inbox-sidebar { padding: 14px; }
+  .inbox-project-list { max-height: 230px; }
+  .inbox-thread { min-height: 420px; }
+  .inbox-messages { min-height: 180px; max-height: 340px; }
+  .inbox-thread-top, .inbox-compose { padding: 14px; }
+  .inbox-thread-tools { padding-inline: 14px; }
+}
+@media (max-height: 450px) and (min-width: 721px) {
+  .inbox-messages { max-height: 200px; min-height: 110px; }
+  .inbox-project-list { max-height: 190px; }
+}
