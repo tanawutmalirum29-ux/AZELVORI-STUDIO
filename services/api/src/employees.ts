@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import { CognitoIdentityProviderClient, AdminCreateUserCommand, AdminSetUserPasswordCommand, AdminDisableUserCommand } from "@aws-sdk/client-cognito-identity-provider";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
-import { DynamoDBDocumentClient, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { DynamoDBDocumentClient, UpdateCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { z } from "zod";
 import { authorizeStaff, HttpError, type Repository } from "./domain";
 import { meta, row, check, type WorkspaceStore } from "./workspace-store";
@@ -24,7 +24,7 @@ const founderKey = (sub: string) => ({ ...meta("STAFF#" + sub), version: null, s
 export class EmployeeService {
   constructor(
     private store: WorkspaceStore, private leads: Repository,
-    private table: string, private pool: string,
+    private table: string, private pool: string, private auditTable: string,
     private cognito = new CognitoIdentityProviderClient({}),
     private dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({})),
   ) {}
@@ -116,6 +116,52 @@ export class EmployeeService {
       // API authorization remains revoked immediately even if Cognito fails.
     }
     return { employee };
+  }
+  async leadsPage(actor: Actor, cursor?: string) {
+    await this.active(actor);
+    return this.leads.listLeads(cursor);
+  }
+  /** Staff acknowledgement never approves a contract or creates a project. */
+  async acknowledge(actor: Actor, id: string) {
+    await this.active(actor);
+    if (!/^LEAD-\d{4}-[A-F0-9]{16}$/.test(id))
+      throw new HttpError(404, "NOT_FOUND", "ไม่พบงาน");
+    const lead = await this.leads.getLead(id);
+    if (!lead) throw new HttpError(404, "NOT_FOUND", "ไม่พบงาน");
+    if (lead.status !== "NEW")
+      throw new HttpError(409, "ALREADY_HANDLED", "งานนี้ถูกรับเรื่องหรือเปลี่ยนสถานะแล้ว");
+    const now = new Date().toISOString();
+    try {
+      await this.dynamo.send(new TransactWriteCommand({
+        TransactItems: [
+          { ConditionCheck: {
+            TableName: this.table, Key: { pk: "EMPLOYEE#" + actor.sub, sk: "META" },
+            ConditionExpression: "#d.#active = :yes AND #d.#role = :role",
+            ExpressionAttributeNames: { "#d": "data", "#active": "active", "#role": "role" },
+            ExpressionAttributeValues: { ":yes": true, ":role": "EMPLOYEE" },
+          } },
+          { Update: {
+            TableName: this.table, Key: { pk: "LEAD#" + id, sk: "META" },
+            UpdateExpression: "SET #d.#status = :ack, #d.#version = :next",
+            ConditionExpression: "#d.#version = :old AND #d.#status = :new",
+            ExpressionAttributeNames: { "#d": "data", "#status": "status", "#version": "version" },
+            ExpressionAttributeValues: { ":ack": "ACKNOWLEDGED", ":new": "NEW",
+              ":old": lead.version, ":next": lead.version + 1 },
+          } },
+          { Put: {
+            TableName: this.auditTable,
+            Item: { pk: "LEAD#" + id, sk: now + "#" + randomUUID(),
+              action: "employee.lead.acknowledged", target: id, actor: actor.sub, at: now },
+            ConditionExpression: "attribute_not_exists(pk)",
+          } },
+        ],
+      }));
+    } catch (error) {
+      if (error instanceof Error && error.name === "TransactionCanceledException")
+        throw new HttpError(409, "STALE_LEAD", "งานหรือสิทธิ์เปลี่ยนแล้ว กรุณาโหลดใหม่");
+      throw error;
+    }
+    return { lead: { ...lead, status: "ACKNOWLEDGED" as const, version: lead.version + 1 } };
   }
   async active(actor: Actor) {
     const record = await this.store.get<Employee>(employeeKey(actor.sub));
