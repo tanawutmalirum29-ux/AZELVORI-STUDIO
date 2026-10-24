@@ -252,6 +252,57 @@ async function layout(page: Page, info: TestInfo, name: string) {
     fullPage: true,
   });
 }
+test("founder inbox replies, retries without duplicates and reloads saved messages", async ({
+  page,
+}, info) => {
+  const state = await setup(page, true);
+  state.messages.push({
+    messageId: "88888888-8888-4888-8888-888888888888",
+    projectId,
+    senderId: "customer-a",
+    senderRole: "CUSTOMER",
+    text: "<img src=x onerror=alert(1)> คุยรายละเอียดเว็บไซต์",
+    createdAt: date,
+    status: "PERSISTED",
+  });
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("/admin/inbox");
+  await expect(page.getByRole("heading", { name: "กล่องข้อความลูกค้า" })).toBeVisible();
+  await expect(page.getByText("คุยรายละเอียดเว็บไซต์", { exact: false })).toBeVisible();
+  const reply = page.getByRole("textbox", { name: "ตอบกลับลูกค้า", exact: true });
+  const text = "<script>bad()</script> ส่งราคาเบื้องต้นหลังตรวจบรีฟ";
+  await reply.fill(text);
+  state.failSend = true;
+  await page.getByRole("button", { name: "ส่งข้อความ", exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("ระบบไม่พร้อมชั่วคราว");
+  await expect(reply).toHaveValue(text);
+  await page.getByRole("button", { name: "ส่งข้อความ", exact: true }).click();
+  await expect(page.getByText(text, { exact: true })).toBeVisible();
+  expect(state.sendKeys).toHaveLength(2);
+  expect(state.sendKeys[0]).toBe(state.sendKeys[1]);
+  await page.reload();
+  await expect(page.getByText(text, { exact: true })).toBeVisible();
+  await expect(reply).toHaveValue("");
+  await layout(page, info, "founder-inbox");
+  expect((await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21aa"]).analyze()).violations).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test("customer cannot enter the founder inbox or request other threads", async ({
+  page,
+}) => {
+  await setup(page, false);
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/v1/projects")) requests.push(request.url());
+  });
+  await page.goto("/admin/inbox");
+  await expect(page.getByText("บัญชีลูกค้าไม่สามารถเปิดข้อความของสตูดิโอได้")).toBeVisible();
+  expect(requests).toEqual([]);
+});
+
 test("customer message retries keep draft and key, escape markup, survive reload", async ({
   page,
 }, info) => {
