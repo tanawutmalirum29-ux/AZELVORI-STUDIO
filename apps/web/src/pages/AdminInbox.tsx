@@ -40,7 +40,7 @@ function InboxDesk({ identity, onLost }: {
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
   const drafts = useRef(new Map<string, string>());
-  const pending = useRef<{ id: string; text: string; key: string } | undefined>(undefined);
+  const pending = useRef(new Map<string, { text: string; key: string }>());
   const sendLock = useRef(false);
   const pollLock = useRef(false);
 
@@ -112,11 +112,10 @@ function InboxDesk({ identity, onLost }: {
   }, [selectedId]);
 
   function choose(id: string) {
-    if (sendLock.current || selectedId === id) return;
+    if (sendLock.current || moreBusy || selectedId === id) return;
     if (selectedId) drafts.current.set(selectedId, draft);
     setSelectedId(id);
     setDraft(drafts.current.get(id) ?? "");
-    pending.current = undefined;
   }
 
   async function loadMoreProjects() {
@@ -157,18 +156,18 @@ function InboxDesk({ identity, onLost }: {
     const value = draft.trim();
     if (!selectedId || !value || sendLock.current || loadingThread) return;
     const id = selectedId;
-    if (pending.current?.id !== id || pending.current.text !== value)
-      pending.current = { id, text: value, key: newRequestId() };
+    if (pending.current.get(id)?.text !== value)
+      pending.current.set(id, { text: value, key: newRequestId() });
     sendLock.current = true;
     setSending(true);
     setNote("");
     setError("");
     try {
-      const saved = await client.send(id, value, pending.current.key);
+      const saved = await client.send(id, value, pending.current.get(id)!.key);
       setMessages((old) => mergeMessages(old, [saved]));
       setDraft("");
       drafts.current.delete(id);
-      pending.current = undefined;
+      pending.current.delete(id);
       setNote("ส่งและบันทึกข้อความแล้ว");
     } catch (reason) {
       // Keep the message and idempotency key, so retry cannot create a second copy.
@@ -225,7 +224,7 @@ function InboxDesk({ identity, onLost }: {
                   <button type="button" key={project.projectId}
                     className={project.projectId === selectedId ? "inbox-project active" : "inbox-project"}
                     aria-pressed={project.projectId === selectedId}
-                    disabled={sending}
+                    disabled={sending || moreBusy}
                     onClick={() => choose(project.projectId)}>
                     <strong>{project.title}</strong>
                     <span>{project.leadId}</span>
