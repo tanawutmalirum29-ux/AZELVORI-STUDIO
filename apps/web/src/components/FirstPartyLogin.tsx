@@ -196,8 +196,8 @@ export function FirstPartyLogin({ mode, denied = false, reason = "" }: {
                   maxLength={254} placeholder="you@example.com" value={email}
                   onChange={(event) => setEmail(event.target.value)} disabled={busy} />
               </label>
-              <label className="field" htmlFor="studio-password">
-                <span>รหัสผ่าน</span>
+              <div className="field">
+                <label htmlFor="studio-password">รหัสผ่าน</label>
                 <span className="first-party-password">
                   <input id="studio-password" type={visible ? "text" : "password"}
                     autoComplete="current-password" required value={password}
@@ -206,7 +206,7 @@ export function FirstPartyLogin({ mode, denied = false, reason = "" }: {
                     aria-label={visible ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
                     onClick={() => setVisible(!visible)}>{visible ? "ซ่อน" : "แสดง"}</button>
                 </span>
-              </label>
+              </div>
               <button className="button full" disabled={!configured || busy}>
                 {busy ? "กำลังตรวจสอบ…" : mode === "admin" ? "เข้าสู่ระบบผู้ดูแล" : "เข้าสู่พื้นที่ลูกค้า"} <Icon name="arrow" size={18} />
               </button>
