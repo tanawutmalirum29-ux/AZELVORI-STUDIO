@@ -50,7 +50,6 @@ type CognitoUser = {
   Enabled?: boolean;
   UserStatus?: string;
   UserAttributes?: Attribute[];
-  Attributes?: Attribute[];
 };
 type AwsResult = Record<string, unknown>;
 export type AwsCall = (
@@ -128,18 +127,27 @@ export function awsCli(
   };
 }
 function principal(user: CognitoUser, email: string) {
-  const attributes = user.UserAttributes ?? user.Attributes ?? [];
+  const attributes = user.UserAttributes ?? [];
   const sub = attributes.find((a) => a.Name === "sub")?.Value;
   const address = attributes.find((a) => a.Name === "email")?.Value;
-  if (
-    !sub ||
-    !z.uuid().safeParse(sub).success ||
-    address?.toLowerCase() !== email ||
-    user.Enabled === false ||
-    !["CONFIRMED", "FORCE_CHANGE_PASSWORD"].includes(user.UserStatus ?? "")
-  )
+  // Cognito explicitly does not guarantee RFC UUIDs. Treat its authenticated
+  // AdminGetUser sub as an opaque, case-sensitive identifier and preserve it.
+  // https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-attributes.html
+  if (typeof sub !== "string" || !sub.trim())
     throw new Error(
-      "Cognito principal is disabled, incomplete, or does not exactly match the requested email; no grant written",
+      "COGNITO_SUB_MISSING: Cognito returned no usable sub; no grant written",
+    );
+  if (typeof address !== "string" || address.toLowerCase() !== email)
+    throw new Error(
+      "COGNITO_EMAIL_MISMATCH: Cognito email does not exactly match the requested email; no grant written",
+    );
+  if (user.Enabled !== true)
+    throw new Error(
+      "COGNITO_NOT_ENABLED: Cognito did not confirm that the account is enabled; no grant written",
+    );
+  if (!["CONFIRMED", "FORCE_CHANGE_PASSWORD"].includes(user.UserStatus ?? ""))
+    throw new Error(
+      "COGNITO_STATUS_NOT_READY: Cognito account must be CONFIRMED or FORCE_CHANGE_PASSWORD; no grant written",
     );
   return sub;
 }
@@ -262,7 +270,7 @@ export async function setupAdmin(options: SetupOptions, aws: AwsCall) {
   };
   if (!options.apply) return { mode: "PLAN_ONLY", ...plan };
   if (!user) {
-    const created = await aws("cognito-idp", "admin-create-user", {
+    await aws("cognito-idp", "admin-create-user", {
       UserPoolId: outputs.UserPoolId,
       Username: options.email,
       UserAttributes: [{ Name: "email", Value: options.email }],
@@ -270,11 +278,13 @@ export async function setupAdmin(options: SetupOptions, aws: AwsCall) {
       ForceAliasCreation: false,
       // Cognito generates and delivers the temporary password. Never expose or set it here.
     });
-    user = created.User as CognitoUser;
-    if (!user)
-      throw new Error(
-        "Cognito did not return the created account; no staff grant written",
-      );
+    // Read the actual account from the same pool/email before granting access.
+    // AdminCreateUser's summary is not the source of identity for the grant.
+    // If this read fails, a rerun resumes with the existing account, no resend.
+    user = await aws("cognito-idp", "admin-get-user", {
+      UserPoolId: outputs.UserPoolId,
+      Username: options.email,
+    });
     sub = principal(user, options.email);
     granted = await readGrant(sub);
   }

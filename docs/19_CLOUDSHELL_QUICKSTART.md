@@ -61,6 +61,9 @@ bash scripts/cloudshell-activate.sh --region YOUR_REGION
 | มีค่าของระบบอื่น / IntakeEnabled output ขาด | หยุดตรวจ backend ที่ใช้อยู่ก่อน ตัวช่วยไม่เปลี่ยนปลายทางเดิมหรือปิดรับงานให้เอง |
 | CloudFormation ROLLBACK / UPDATE_IN_PROGRESS | เปิด stack → Events ดูสาเหตุหรือรอจนจบ ไม่ลบตารางหรือ stack เพื่อแก้โดยเดา |
 | CDK bootstrap เก่า / SSM bootstrap version ไม่พบ | ให้ผู้ดูแลตรวจ/อัปเกรด CDKToolkit ในบัญชีและ region เดิมก่อน ตัวช่วยไม่อัปเกรด bootstrap เดิมอัตโนมัติ |
+| รุ่นเก่าขึ้น `Cognito principal is disabled, incomplete...` | ดึง `main` ล่าสุดแล้วรันตัวช่วยด้วยอีเมลเดิม ดูหัวข้อกู้ขั้นตอนบัญชีด้านล่าง รุ่นเก่าตรวจ `sub` เป็น RFC UUID เข้มเกินข้อกำหนดของ Cognito; ข้อความเดิมไม่สามารถแยกได้ว่าบัญชีถูกปิดหรือเป็นปัญหารูปแบบ ID |
+| `COGNITO_SUB_MISSING` / `COGNITO_EMAIL_MISMATCH` | ตรวจบัญชีใน Cognito user pool ของ stack เดิมว่ามี sub และอีเมลตรงกับที่ใส่ ไม่ใช้ Username/อีเมลแทน sub และไม่แก้สิทธิ์ในฐานข้อมูลเอง |
+| `COGNITO_NOT_ENABLED` / `COGNITO_STATUS_NOT_READY` | ตรวจสถานะบัญชีใน Cognito ต้อง Enabled และเป็น CONFIRMED หรือ FORCE_CHANGE_PASSWORD ตัวช่วยไม่เปิดบัญชีที่ถูกปิดหรือเปลี่ยนสถานะให้เอง |
 | Amplify FAILED | เปิด job ID ที่แสดง ดู Build logs แก้สาเหตุแล้วรันใหม่ การสร้าง backend/บัญชีที่สำเร็จแล้วจะยังอยู่ |
 | หมดเวลารอ Amplify | ดู job ID ใน Console ถ้าสำเร็จแล้วให้เปิดหน้าแอดมิน ถ้ายังรันให้รอ ไม่กด deploy ซ้ำ |
 | อีเมลไม่มา / รหัสชั่วคราวหมดอายุ | ตรวจอีเมลและ Spam, Cognito delivery status แล้วให้ผู้ดูแลส่งคำเชิญใหม่จาก user pool เดิม |
@@ -68,6 +71,20 @@ bash scripts/cloudshell-activate.sh --region YOUR_REGION
 | ลงชื่อเข้าได้แต่ไม่ใช่ผู้ดูแล | ตรวจว่าใช้อีเมลเดียวกับแผน ตรวจ staff grant ตามคู่มือ; อย่าแก้ Cognito sub เองโดยเดา |
 
 สิทธิ์ที่ใช้เพิ่มจาก `admin:setup`: อ่าน Amplify app/branch/job, `amplify:UpdateBranch`, `StartJob`, CloudFormation DescribeStacks, Lambda GetAccountSettings และสิทธิ์ CDK bootstrap/deploy ตามทรัพยากรใน template การใช้ helper ไม่เพิ่มสิทธิ์ของ Console user เอง
+
+## รันต่อเมื่อสร้าง backend แล้ว แต่หยุดตอนให้สิทธิ์แอดมิน
+
+ภาพ CloudShell ที่เจ้าของส่งเมื่อ 24 ตุลาคม 2026 แสดงว่า `Azelvori-staging` deploy สำเร็จใน `ap-southeast-2`, API ผ่านการตรวจของตัวช่วย, `LambdaConcurrencyMode=shared` และ `IntakeEnabled=false` แต่หยุดที่การตรวจบัญชี Cognito ก่อนเขียน grant และเชื่อม Amplify จึงยังไม่ยืนยันว่าเปิดแอดมินได้แล้ว
+
+พบข้อผิดพลาดใน source เดิม: บังคับ `sub` เป็น RFC UUID ทั้งที่ [AWS ระบุว่า Cognito ใช้รูปแบบเฉพาะและไม่ควรตรวจ UUID อย่างเข้มงวด](https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-attributes.html) รุ่นปัจจุบันใช้ `sub` ที่อ่านผ่าน AdminGetUser เป็นรหัสอ้างอิงโดยเก็บค่าเดิมทุกตัวอักษร ตรวจอีเมล/Enabled/สถานะ และอ่านบัญชีจริงอีกครั้งหลัง AdminCreateUser ก่อนเขียน grant ภาพ error เดิมไม่เปิดเผย sub หรือเหตุที่ไม่ผ่านแต่ละข้อ จึงยังต้องตรวจผลการรันรุ่นแก้ไขจริง
+
+ใน CloudShell โฟลเดอร์เดิม รัน:
+
+```bash
+git pull --ff-only origin main && bash scripts/cloudshell-activate.sh
+```
+
+ใส่อีเมลเดิม ตรวจว่าแผนแสดง `backend: REUSE`, region/app เดิม แล้วพิมพ์ `DEPLOY` ตัวช่วยจะตรวจบัญชีที่มีอยู่ ให้สิทธิ์และเชื่อม Amplify ต่อ โดยไม่ deploy backend ซ้ำหรือส่งคำเชิญซ้ำให้บัญชีเดิม รอ `เผยแพร่สำเร็จ` แล้วใช้คำเชิญเดิมลงชื่อเข้า `/admin/login` หากได้รหัส `COGNITO_...` ใหม่ ให้ตรวจสาเหตุเฉพาะตามตารางด้านบน ไม่ลบ stack หรือบัญชีเพื่อเริ่มใหม่
 
 ## หลังเข้าแอดมินได้แล้ว
 

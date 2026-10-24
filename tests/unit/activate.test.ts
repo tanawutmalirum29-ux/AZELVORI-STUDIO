@@ -57,6 +57,7 @@ function fixture() {
   const state = {
     exists: false,
     userExists: false,
+    userSub: sub,
     grant: undefined as unknown,
     limit: 1000 as number | undefined,
     statuses: ["RUNNING", "SUCCEED"],
@@ -88,7 +89,7 @@ function fixture() {
           Enabled: true,
           UserStatus: "FORCE_CHANGE_PASSWORD",
           UserAttributes: [
-            { Name: "sub", Value: sub },
+            { Name: "sub", Value: state.userSub },
             { Name: "email", Value: options.email },
           ],
         };
@@ -99,7 +100,7 @@ function fixture() {
             Enabled: true,
             UserStatus: "FORCE_CHANGE_PASSWORD",
             Attributes: [
-              { Name: "sub", Value: sub },
+              { Name: "sub", Value: state.userSub },
               { Name: "email", Value: options.email },
             ],
           },
@@ -383,6 +384,36 @@ describe("guided AWS activation", () => {
     expect((await activate(options, f.deps)).mode).toBe("DEPLOYED");
     expect(f.deps.deploy).not.toHaveBeenCalled();
     expect(f.writes().map((c) => c[1])).toEqual(["start-job"]);
+  });
+  it("finishes a partially activated shared stack with an existing Cognito-specific subject", async () => {
+    const f = fixture();
+    f.state.exists = true;
+    f.state.userExists = true;
+    f.state.userSub = "11111111-1111-7111-6111-111111111111";
+    f.outputs.LambdaConcurrencyMode = "shared";
+    expect((await activate(options, f.deps)).mode).toBe("DEPLOYED");
+    expect(f.deps.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        backend: "REUSE",
+        bootstrap: false,
+        lambdaConcurrency: "shared",
+      }),
+    );
+    expect(f.deps.deploy).not.toHaveBeenCalled();
+    expect(f.writes().map((c) => c[1])).toEqual([
+      "transact-write-items",
+      "update-branch",
+      "start-job",
+    ]);
+    expect(f.state.grant).toMatchObject({
+      data: {
+        M: { userId: { S: f.state.userSub }, role: { S: "FOUNDER_ADMIN" } },
+      },
+    });
+    expect(f.branch.environmentVariables).toMatchObject({
+      VITE_PUBLIC_INTAKE_ENABLED: "false",
+      EXISTING_BRANCH_SECRET: "branch-secret-canary",
+    });
   });
   it("refuses a revoked owner grant before any Amplify change", async () => {
     const f = fixture();
