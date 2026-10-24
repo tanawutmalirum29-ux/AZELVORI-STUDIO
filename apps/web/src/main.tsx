@@ -21,6 +21,9 @@ const Admin = lazy(() =>
 const AdminLogin = lazy(() =>
   import("./components/AdminEntry").then((m) => ({ default: m.AdminEntry })),
 );
+const AdminInbox = lazy(() =>
+  import("./pages/AdminInbox").then((m) => ({ default: m.AdminInbox })),
+);
 const AdminSetup = lazy(() =>
   import("./pages/AdminSetup").then((m) => ({ default: m.AdminSetup })),
 );
@@ -44,6 +47,7 @@ const titles: Record<string, string> = {
   "/admin/login": "เข้าสู่ระบบผู้ดูแล",
   "/admin/setup": "เปิดใช้งานแอดมิน",
   "/admin/projects": "จัดการโปรเจกต์",
+  "/admin/inbox": "ข้อความลูกค้า",
   "/invite": "คำเชิญเข้าโปรเจกต์",
   "/auth/callback": "ยืนยันบัญชี",
   "/privacy": "ความเป็นส่วนตัว",
@@ -60,6 +64,7 @@ function Route() {
   if (path === "/admin") return <Admin />;
   if (path === "/admin/login") return <AdminLogin />;
   if (path === "/admin/setup") return <AdminSetup />;
+  if (path === "/admin/inbox") return <AdminInbox />;
   if (path === "/app" || path === "/admin/projects")
     return <CustomerAccount requireAdmin={path === "/admin/projects"} />;
   if (path === "/invite") return <Invite />;
