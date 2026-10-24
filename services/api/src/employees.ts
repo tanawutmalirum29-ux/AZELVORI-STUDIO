@@ -56,7 +56,7 @@ export class EmployeeService {
     const key = String(await this.nextNumber()).padStart(5, "0");
     // Embedding the non-recycled key makes generated passwords unique across all issues,
     // independent of random collision probability. Never store password in DynamoDB.
-    const password = "AZ-" + key + "-" + randomBytes(22).toString("base64url");
+    const password = "AZa-" + key + "-" + randomBytes(22).toString("base64url");
     const username = "emp-" + key;
     const created = await this.cognito.send(new AdminCreateUserCommand({
       UserPoolId: this.pool, Username: username, TemporaryPassword: password,
