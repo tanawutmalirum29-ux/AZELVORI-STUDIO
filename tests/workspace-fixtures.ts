@@ -56,7 +56,7 @@ export class MemoryWorkspaceStore implements WorkspaceStore {
       const old = this.rows.get(key);
       if (c.staff) {
         const d = old?.data as { active?: boolean; role?: string } | undefined;
-        if (!d?.active || d.role !== "FOUNDER_ADMIN") return false;
+        if (!d?.active || d.role !== (c.staff === "EMPLOYEE" ? "EMPLOYEE" : "FOUNDER_ADMIN")) return false;
       } else if (c.version === null ? !!old : old?.version !== c.version)
         return false;
     }
