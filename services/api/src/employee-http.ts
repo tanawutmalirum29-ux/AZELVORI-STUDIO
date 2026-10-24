@@ -21,7 +21,8 @@ export async function employeeRoute(
   const isAdmin = path === "/api/v1/admin/employees" ||
     /^\/api\/v1\/admin\/employees\/\d{5,}\/revoke$/.test(path);
   const isEmployee = path === "/api/v1/employee/me" ||
-    path === "/api/v1/employee/projects" ||
+    path === "/api/v1/employee/projects" || path === "/api/v1/employee/leads" ||
+    /^\/api\/v1\/employee\/leads\/[^/]+\/acknowledge$/.test(path) ||
     /^\/api\/v1\/employee\/projects\/[^/]+\/messages$/.test(path);
   if (!isAdmin && !isEmployee) return;
   const claims = claimsFrom(event);
@@ -44,6 +45,10 @@ export async function employeeRoute(
       return result(await employee.active(actor));
     if (path === "/api/v1/employee/projects" && method === "GET")
       return result(await workspace.employeeProjects(actor, event.queryStringParameters?.cursor));
+    if (path === "/api/v1/employee/leads" && method === "GET")
+      return result(await employee.leadsPage(actor, event.queryStringParameters?.cursor));
+    if (path.startsWith("/api/v1/employee/leads/") && method === "POST")
+      return result(await employee.acknowledge(actor, path.split("/")[5]));
     const id = path.split("/")[5];
     if (!ProjectIdSchema.safeParse(id).success)
       throw new HttpError(404, "NOT_FOUND", "ไม่พบโปรเจกต์");
