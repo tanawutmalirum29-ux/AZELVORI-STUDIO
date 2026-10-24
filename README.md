@@ -45,7 +45,7 @@ npm run test:e2e:workspace
 
 ## ผลตรวจและขอบเขตล่าสุด
 
-[CI ผ่านบนโค้ด `6574a56`](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/actions/runs/40052823650): ทดสอบระบบและตัวช่วยเปิดแอดมิน 158 กรณี และเบราว์เซอร์ 140 กรณี (Chromium/WebKit × 5 ขนาดจอ) พร้อม build, CDK synth, hosting preflight และ dependency audit ผ่าน ดูวิธีเริ่มและขอบเขตการตรวจใน [CloudShell quick start](docs/19_CLOUDSHELL_QUICKSTART.md). ผลรอบก่อนเก็บไว้ใน [Admin desk QA](docs/18_QA_ADMIN_DESK.md), [Workspace QA](docs/16_QA_PRIVATE_WORKSPACE.md) และ [Foundation QA](docs/12_QA_FOUNDATION.md)
+[CI ผ่านบนโค้ด `12b30b4`](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/actions/runs/40054843771): ทดสอบระบบและตัวช่วยเปิดแอดมิน 170 กรณี และเบราว์เซอร์ 140 กรณี (Chromium/WebKit × 5 ขนาดจอ) พร้อม build, CDK synth, hosting preflight และ dependency audit ผ่าน ดูวิธีเริ่มและขอบเขตการตรวจใน [CloudShell quick start](docs/19_CLOUDSHELL_QUICKSTART.md). ผลรอบก่อนเก็บไว้ใน [Admin desk QA](docs/18_QA_ADMIN_DESK.md), [Workspace QA](docs/16_QA_PRIVATE_WORKSPACE.md) และ [Foundation QA](docs/12_QA_FOUNDATION.md)
 
 ดู [แบบระบบและขั้นตอนเปิด pilot](docs/15_PRIVATE_WORKSPACE_PILOT.md) และ [สถานะงานเทียบแผน](docs/10_IMPLEMENTATION_STATUS.md) — ผลทดสอบ source ยังไม่ใช่การยืนยันระบบบน AWS จริงหรืออนุมัติเปิด production
 

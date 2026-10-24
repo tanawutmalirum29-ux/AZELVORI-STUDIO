@@ -79,7 +79,7 @@ bash scripts/cloudshell-activate.sh --region YOUR_REGION
 
 การทดสอบอัตโนมัติของตัวช่วยใช้ AWS responses จำลองและ CDK synth ไม่ใช่หลักฐานว่า deploy หรือล็อกอินในบัญชี AWS จริงสำเร็จ ต้องตรวจผลจริงจาก CloudShell/Amplify และการเข้าใช้งานของคุณ
 
-## ผลตรวจรุ่นนี้ — 24 ตุลาคม 2026
+## ผลตรวจรุ่นเปิดระบบแรก — 24 ตุลาคม 2026
 
 [GitHub Actions run 40052823650](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/actions/runs/40052823650) บน source commit `6574a56248d9d922480de185bac7a6ae0c28a98b` ผ่านทั้งหมด:
 
@@ -92,3 +92,12 @@ bash scripts/cloudshell-activate.sh --region YOUR_REGION
 หลักฐาน CI artifact `12544201539` เก็บรายงาน/ภาพ/template ถึง **7 พฤศจิกายน 2026** ตาม retention ของ workflow; ไม่ใช่ backup ของข้อมูลธุรกิจ
 
 อ้างอิงทางการ: [CloudShell และ credentials](https://docs.aws.amazon.com/cloudshell/latest/userguide/welcome.html), [CloudShell software/พื้นที่](https://docs.aws.amazon.com/cloudshell/latest/userguide/vm-specs.html), [CDK bootstrap](https://docs.aws.amazon.com/cdk/v2/guide/bootstrapping-env.html), [Amplify UpdateBranch](https://docs.aws.amazon.com/cli/latest/reference/amplify/update-branch.html), [Amplify StartJob](https://docs.aws.amazon.com/cli/latest/reference/amplify/start-job.html), [Node.js release checksums](https://nodejs.org/dist/latest-v22.x/SHASUMS256.txt).
+
+
+## ผลแก้กรณีโควตา Lambda ต่ำ — 24 ตุลาคม 2026
+
+[CI run 40054843771](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/actions/runs/40054843771) บน source `12b30b4715ce52e962a43b96c6b12a7dfdfdbd8e` ผ่าน **170 tests / 14 files + 140 browser cases** พร้อม build, CDK synth, hosting preflight และ audit 0 vulnerabilities
+
+ทดสอบโควตาจำลอง 10/104 → shared, 105 → reserved, ปฏิเสธ quota ที่อ่านไม่ได้/เป็นศูนย์, ตรวจแผนใหม่เมื่อโหมดเปลี่ยน และใช้ stack shared เดิมโดยไม่ deploy ทับ ตรวจ template shared ที่ synth จริงแล้วว่าไม่มี ReservedConcurrentExecutions, intake ปิด, throttle ต่อเส้นทาง rate 2/burst 5 และ MFA/JWT ยังทำงานตามแบบเดิม การเปิด intake หรือ production ด้วย shared ถูกปฏิเสธ
+
+ผลนี้ยืนยัน source และ template เท่านั้น; ยังต้องรันใน CloudShell และทดสอบบัญชี AWS จริงของเจ้าของ ไม่มีการสร้างทรัพยากรจริงจากสภาพแวดล้อมพัฒนารอบนี้
