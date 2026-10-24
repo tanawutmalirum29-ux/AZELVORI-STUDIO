@@ -266,7 +266,7 @@ function InboxDesk({ identity, onLost }: {
                 )}
               </div>
               <div className="inbox-messages" role="log" aria-label="ข้อความที่บันทึกแล้ว"
-                aria-live="off">
+                aria-live="off" tabIndex={0}>
                 {loadingThread ? <p role="status">กำลังโหลดข้อความ…</p>
                   : messages.length === 0 ? <p>ยังไม่มีข้อความ เริ่มสนทนาได้เลย</p>
                   : messages.map((item) => (
