@@ -69,6 +69,7 @@ bash scripts/cloudshell-activate.sh --region YOUR_REGION
 | อีเมลไม่มา / รหัสชั่วคราวหมดอายุ | ตรวจอีเมลและ Spam, Cognito delivery status แล้วให้ผู้ดูแลส่งคำเชิญใหม่จาก user pool เดิม |
 | พื้นที่ CloudShell เต็ม / ดาวน์โหลด Node ไม่สำเร็จ | ตรวจพื้นที่และเครือข่ายของ CloudShell ก่อนรันใหม่ ตัวช่วยใช้พื้นที่ชั่วคราวสำหรับ Node/cache ไม่ลบไฟล์ส่วนตัว |
 | ลงชื่อเข้าได้แต่ไม่ใช่ผู้ดูแล | ตรวจว่าใช้อีเมลเดียวกับแผน ตรวจ staff grant ตามคู่มือ; อย่าแก้ Cognito sub เองโดยเดา |
+| เงื่อนไขรหัสผ่านมากเกินไป / ยังบังคับ 14 ตัวพร้อมอักขระพิเศษ | source ปัจจุบันใช้ขั้นต่ำ 12 ตัว โดยไม่บังคับผสมประเภทอักขระ pool ที่สร้างแล้วต้องเปลี่ยน Password policy ใน Cognito ตาม [วิธีตั้งรหัสที่จำง่าย](17_ADMIN_ACTIVATION.md#ใช้รหัสผ่านที่จำง่าย); การรัน activation ซ้ำหรือ build Amplify ไม่เปลี่ยนกฎของ pool เดิม |
 
 สิทธิ์ที่ใช้เพิ่มจาก `admin:setup`: อ่าน Amplify app/branch/job, `amplify:UpdateBranch`, `StartJob`, CloudFormation DescribeStacks, Lambda GetAccountSettings และสิทธิ์ CDK bootstrap/deploy ตามทรัพยากรใน template การใช้ helper ไม่เพิ่มสิทธิ์ของ Console user เอง
 
@@ -85,6 +86,8 @@ git pull --ff-only origin main && bash scripts/cloudshell-activate.sh
 ```
 
 ใส่อีเมลเดิม ตรวจว่าแผนแสดง `backend: REUSE`, region/app เดิม แล้วพิมพ์ `DEPLOY` ตัวช่วยจะตรวจบัญชีที่มีอยู่ ให้สิทธิ์และเชื่อม Amplify ต่อ โดยไม่ deploy backend ซ้ำหรือส่งคำเชิญซ้ำให้บัญชีเดิม รอ `เผยแพร่สำเร็จ` แล้วใช้คำเชิญเดิมลงชื่อเข้า `/admin/login` หากได้รหัส `COGNITO_...` ใหม่ ให้ตรวจสาเหตุเฉพาะตามตารางด้านบน ไม่ลบ stack หรือบัญชีเพื่อเริ่มใหม่
+
+**ผลหลังรันต่อ:** ภาพจากเจ้าของเวลา 10:36 วันที่ 24 ตุลาคม 2026 แสดงว่าใช้ backend เดิม ตรวจ/ให้สิทธิ์เจ้าของ เติม 6 ค่า และเผยแพร่ Amplify job 15 สำเร็จ ตรวจหน้า setup จริงแล้ว Cognito/API ตั้งค่าแล้ว, health ตอบกลับและ intake ปิด เจ้าของมาถึงหน้าตั้งรหัสครั้งแรก แต่ยังไม่มีหลักฐานการล็อกอินครบ MFA หรือการอ่าน/เขียนงานจากบัญชีจริง หลังเปิดสำเร็จไม่ต้องรัน activation ซ้ำเพื่อแก้กฎรหัสผ่าน ให้ใช้วิธีเปลี่ยน Password policy ด้านบน
 
 ## หลังเข้าแอดมินได้แล้ว
 

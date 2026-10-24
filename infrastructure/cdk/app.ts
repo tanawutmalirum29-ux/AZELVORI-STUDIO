@@ -111,11 +111,13 @@ export class FoundationStack extends Stack {
       mfa: cognito.Mfa.REQUIRED,
       mfaSecondFactor: { sms: false, otp: true },
       passwordPolicy: {
-        minLength: 14,
-        requireDigits: true,
-        requireLowercase: true,
-        requireUppercase: true,
-        requireSymbols: true,
+        // Allow memorable passphrases without character-class requirements.
+        // This pool requires a separate TOTP factor for every sign-in.
+        minLength: 12,
+        requireDigits: false,
+        requireLowercase: false,
+        requireUppercase: false,
+        requireSymbols: false,
       },
       deletionProtection: true,
       removalPolicy: RemovalPolicy.RETAIN,

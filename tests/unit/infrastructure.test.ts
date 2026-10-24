@@ -44,6 +44,15 @@ describe("AWS foundation safeguards", () => {
       EnabledMfas: ["SOFTWARE_TOKEN_MFA"],
       AdminCreateUserConfig: { AllowAdminCreateUserOnly: true },
       DeletionProtection: "ACTIVE",
+      Policies: {
+        PasswordPolicy: {
+          MinimumLength: 12,
+          RequireNumbers: false,
+          RequireLowercase: false,
+          RequireUppercase: false,
+          RequireSymbols: false,
+        },
+      },
     });
     template.hasResourceProperties("AWS::Cognito::UserPoolClient", {
       GenerateSecret: false,
@@ -145,6 +154,16 @@ describe("AWS foundation safeguards", () => {
     });
     template.hasResourceProperties("AWS::Cognito::UserPool", {
       MfaConfiguration: "ON",
+      EnabledMfas: ["SOFTWARE_TOKEN_MFA"],
+      Policies: {
+        PasswordPolicy: {
+          MinimumLength: 12,
+          RequireNumbers: false,
+          RequireLowercase: false,
+          RequireUppercase: false,
+          RequireSymbols: false,
+        },
+      },
     });
     template.hasResourceProperties("AWS::ApiGatewayV2::Route", {
       RouteKey: "GET /api/v1/admin/leads",
