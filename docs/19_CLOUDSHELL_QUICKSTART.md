@@ -33,7 +33,7 @@ CloudShell ใช้สิทธิ์ของบัญชีที่ลงช
 
 - ตรวจ AWS account/region, repository, Amplify app และ branch ให้ตรงเป้าหมาย ก่อนแสดงแผน
 - เตรียม Node.js ≥22.14 และติดตั้ง dependencies ตาม lockfile หาก Node เก่า จะใช้ Node 22 จาก `nodejs.org` พร้อมตรวจ SHA-256 ในโฟลเดอร์ชั่วคราวสำหรับคำสั่งนี้ ไม่แก้ shell profile
-- ถ้ายังไม่มี backend: ตรวจ Lambda quota, สร้าง CDKToolkit เมื่อจำเป็น แล้ว deploy `Azelvori-staging` (API, Cognito, DynamoDB 2 ตาราง, logs, roles และ alarm) CDKToolkit มี bucket/roles สำหรับ deploy ด้วย
+- ถ้ายังไม่มี backend: ตรวจ Lambda quota, สร้าง CDKToolkit เมื่อจำเป็น แล้ว deploy `Azelvori-staging` (API, Cognito, DynamoDB 2 ตาราง, logs, roles และ alarm) CDKToolkit มี bucket/roles สำหรับ deploy ด้วย ถ้า unreserved quota ≥105 จะจองพร้อมกัน 5 งาน; ถ้ามี 1–104 จะเลือก `lambdaConcurrency: shared` ใช้โควตาส่วนกลางที่มีอยู่ เพื่อให้เริ่มทดสอบแอดมินได้โดยไม่ต้องรอเพิ่ม quota
 - ถ้ามี backend แล้ว: ใช้เฉพาะ stack ที่ตรงกับเว็บและยังปิดรับบรีฟ **ไม่ deploy ทับ stack เดิม** รุ่นเก่าที่ไม่มี `IntakeEnabled` output ต้องอัปเดตตาม [คู่มือเดิม](17_ADMIN_ACTIVATION.md) ด้วย context เดิมก่อน
 - ตรวจ public API `/health` ว่ารองรับ CRM และ private workspace จากนั้นสร้าง/ตรวจบัญชีเจ้าของและสิทธิ์จริง พร้อม audit ในฐานข้อมูล
 - เติม public identifiers 6 ค่าเฉพาะ Amplify branch `main` โดยรักษาตัวแปรอื่น ไม่แสดงค่าลับที่มีอยู่ และอ่านตรวจหลังบันทึก
@@ -55,7 +55,8 @@ bash scripts/cloudshell-activate.sh --region YOUR_REGION
 |---|---|
 | App ไม่พบ / ResourceNotFound / เป้าหมายไม่ตรง | กลับ Amplify ตรวจบัญชีและ region ของ app `d3uhwi8blbgrci` แล้วเปิด CloudShell ใน region นั้น |
 | AccessDenied / Unauthorized | ให้ผู้ดูแล AWS ตรวจสิทธิ์ของ Console session นี้ตามบริการที่ปฏิเสธ |
-| Lambda concurrency ไม่พอ | ใน Service Quotas → AWS Lambda ของ region นี้ ขอเพิ่ม Concurrent executions ให้พอจอง 5 โดยเหลือ unreserved อย่างน้อย 100; อย่าแก้ quota ของงานอื่นโดยไม่ตรวจ |
+| รุ่นเก่าขึ้น Lambda concurrency ไม่พอสำหรับจอง 5 | ในโฟลเดอร์ AZELVORI-STUDIO รัน `git pull --ff-only origin main` แล้ว `bash scripts/cloudshell-activate.sh` ใหม่ รุ่นปัจจุบันรองรับโควตา 1–104 ด้วยโหมด shared สำหรับ staging ที่ปิดรับบรีฟ |
+| อ่าน Lambda quota ไม่ได้ / quota เป็น 0 | ตรวจ Lambda GetAccountSettings และสิทธิ์ของ region นี้ก่อน; ตัวช่วยไม่เดา quota ถ้าไม่มีโควตาที่ใช้ได้ต้องติดต่อผู้ดูแล AWS/Service Quotas |
 | main กำลัง build | รอ job เดิมจบใน Amplify แล้วรันคำสั่งเดิม |
 | มีค่าของระบบอื่น / IntakeEnabled output ขาด | หยุดตรวจ backend ที่ใช้อยู่ก่อน ตัวช่วยไม่เปลี่ยนปลายทางเดิมหรือปิดรับงานให้เอง |
 | CloudFormation ROLLBACK / UPDATE_IN_PROGRESS | เปิด stack → Events ดูสาเหตุหรือรอจนจบ ไม่ลบตารางหรือ stack เพื่อแก้โดยเดา |
@@ -73,6 +74,8 @@ bash scripts/cloudshell-activate.sh --region YOUR_REGION
 เป้าหมายรอบนี้คือ **เปิดบัญชีผู้ดูแลและเชื่อมระบบจริงสำหรับทดสอบส่วนตัว** ตัวช่วยยังไม่เปิดรับบรีฟสาธารณะ ไม่ยืนยันข้อมูลธุรกิจ/นโยบายแทนเจ้าของ และไม่ส่งข้อความตอบลูกค้าอัตโนมัติ
 
 ทดสอบ login/MFA, logout, เปิดหน้าใหม่และสิทธิ์ผู้ดูแลก่อน จากนั้นทำตาม [เริ่มรับบรีฟและคุมงาน](17_ADMIN_ACTIVATION.md#เริ่มรับบรีฟและคุมงาน): ยืนยันข้อมูลธุรกิจ/นโยบาย, budget/การแจ้งเตือน, backup และทดสอบข้อมูลสมมติครบวงจร ก่อนเปิด intake ทั้ง backend และ frontend
+
+หากแผนเป็น `lambdaConcurrency: shared` จะใช้ pool ร่วมกับ Lambda อื่นในบัญชี/region และไม่รับประกันว่ามี capacity ว่างเสมอ ค่า API Gateway ต่อเส้นทางตั้งเป้า **2 คำขอ/วินาที, burst 5** แบบ best effort ไม่ใช่เพดาน concurrency หรือค่าใช้จ่าย โหมดนี้ใช้ได้เฉพาะ staging ที่ปิด intake; ก่อนเปิดรับบรีฟหรือ production ต้องมี quota พอจอง 5 โดยเหลือ unreserved 100 และ deploy ด้วย `-c lambdaConcurrency=reserved` พร้อม context เดิม ตัวช่วยเปิดครั้งแรกไม่เปลี่ยน stack เดิมให้อัตโนมัติ ดู [AWS reserved concurrency](https://docs.aws.amazon.com/lambda/latest/dg/configuration-concurrency.html) และ [HTTP API throttling](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-throttling.html)
 
 การทดสอบอัตโนมัติของตัวช่วยใช้ AWS responses จำลองและ CDK synth ไม่ใช่หลักฐานว่า deploy หรือล็อกอินในบัญชี AWS จริงสำเร็จ ต้องตรวจผลจริงจาก CloudShell/Amplify และการเข้าใช้งานของคุณ
 

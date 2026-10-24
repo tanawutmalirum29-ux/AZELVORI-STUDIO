@@ -19,6 +19,7 @@ import {
 import { fileURLToPath } from "node:url";
 import { Construct } from "constructs";
 
+export type LambdaConcurrencyMode = "reserved" | "shared";
 export type FoundationOptions = {
   stage: "dev" | "staging" | "prod";
   appOrigin: string;
@@ -26,10 +27,20 @@ export type FoundationOptions = {
   legalReady: boolean;
   budgetEmail?: string;
   budgetUsd?: number;
+  lambdaConcurrency?: LambdaConcurrencyMode;
 };
 export function validateOptions(o: FoundationOptions) {
   if (!["dev", "staging", "prod"].includes(o.stage))
     throw new Error("stage must be dev, staging or prod");
+  if (!["reserved", "shared"].includes(o.lambdaConcurrency ?? "reserved"))
+    throw new Error("lambdaConcurrency must be reserved or shared");
+  if (
+    o.lambdaConcurrency === "shared" &&
+    (o.stage !== "staging" || o.intakeEnabled)
+  )
+    throw new Error(
+      "Shared Lambda concurrency is only supported for staging with public intake disabled; use reserved before opening intake",
+    );
   const url = new URL(o.appOrigin);
   if (
     url.origin !== o.appOrigin ||
@@ -63,6 +74,7 @@ export class FoundationStack extends Stack {
   constructor(scope: Construct, id: string, options: FoundationOptions) {
     super(scope, id);
     validateOptions(options);
+    const concurrencyMode = options.lambdaConcurrency ?? "reserved";
     Tags.of(this).add("Project", "AZELVORI-STUDIO");
     Tags.of(this).add("Environment", options.stage);
     const data = new dynamodb.Table(this, "Operations", {
@@ -154,7 +166,8 @@ export class FoundationStack extends Stack {
       ),
       timeout: Duration.seconds(15),
       memorySize: 256,
-      reservedConcurrentExecutions: 5,
+      reservedConcurrentExecutions:
+        concurrencyMode === "reserved" ? 5 : undefined,
       logGroup,
       environment: {
         DATA_TABLE: data.tableName,
@@ -280,8 +293,10 @@ export class FoundationStack extends Stack {
     });
     const stage = api.defaultStage?.node.defaultChild as apigateway.CfnStage;
     stage.defaultRouteSettings = {
-      throttlingBurstLimit: 20,
-      throttlingRateLimit: 10,
+      // Shared capacity is for private staging tests. API Gateway targets are
+      // best-effort per route, not a hard concurrency or spending ceiling.
+      throttlingBurstLimit: concurrencyMode === "shared" ? 5 : 20,
+      throttlingRateLimit: concurrencyMode === "shared" ? 2 : 10,
     };
     stage.accessLogSettings = {
       destinationArn: accessLogs.logGroupArn,
@@ -327,6 +342,7 @@ export class FoundationStack extends Stack {
     new CfnOutput(this, "IntakeEnabled", {
       value: String(options.intakeEnabled),
     });
+    new CfnOutput(this, "LambdaConcurrencyMode", { value: concurrencyMode });
   }
 }
 // Importing the stack for assertions must not synthesize a second app.
@@ -338,6 +354,8 @@ if (process.argv[1]?.endsWith("/app.ts")) {
     appOrigin: app.node.tryGetContext("appOrigin") ?? "http://localhost:4173",
     intakeEnabled: app.node.tryGetContext("intakeEnabled") === "true",
     legalReady: app.node.tryGetContext("legalReady") === "true",
+    lambdaConcurrency:
+      app.node.tryGetContext("lambdaConcurrency") ?? "reserved",
     budgetEmail: app.node.tryGetContext("budgetEmail"),
     budgetUsd: app.node.tryGetContext("budgetUsd")
       ? Number(app.node.tryGetContext("budgetUsd"))

@@ -5,6 +5,7 @@ import {
   parseActivationOptions,
   target,
   type ActivationOptions,
+  type ActivationPlan,
 } from "../../scripts/activate";
 import { AwsFailure, type AwsCall } from "../../scripts/admin-setup";
 
@@ -57,7 +58,7 @@ function fixture() {
     exists: false,
     userExists: false,
     grant: undefined as unknown,
-    limit: 1000,
+    limit: 1000 as number | undefined,
     statuses: ["RUNNING", "SUCCEED"],
     priorJobStatus: "SUCCEED",
     corruptUpdate: false,
@@ -140,8 +141,9 @@ function fixture() {
   const deps = {
     aws,
     confirm: vi.fn(async () => true),
-    deploy: vi.fn(async () => {
+    deploy: vi.fn(async (plan: ActivationPlan) => {
       state.exists = true;
+      outputs.LambdaConcurrencyMode = plan.lambdaConcurrency;
     }),
     health: vi.fn(async (_url: string) => ({
       status: "ok",
@@ -211,11 +213,78 @@ describe("guided AWS activation", () => {
     expect(f.deps.deploy).not.toHaveBeenCalled();
     expect(f.deps.confirm).not.toHaveBeenCalled();
   });
-  it("stops before creating any resources if Lambda reservation would exceed quota", async () => {
+  it.each([10, 104])(
+    "activates private staging with shared capacity when quota is %i",
+    async (limit) => {
+      const f = fixture();
+      f.state.limit = limit;
+      expect((await activate(options, f.deps)).mode).toBe("DEPLOYED");
+      expect(f.deps.deploy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lambdaConcurrency: "shared",
+          unreservedConcurrency: limit,
+        }),
+      );
+      expect(f.outputs.LambdaConcurrencyMode).toBe("shared");
+      expect(f.branch.environmentVariables).toMatchObject({
+        VITE_PUBLIC_INTAKE_ENABLED: "false",
+      });
+      expect(JSON.stringify(f.deps.confirm.mock.calls)).toContain(
+        '"lambdaConcurrency":"shared"',
+      );
+    },
+  );
+  it.each([0, undefined, NaN, 1.5, -1])(
+    "stops before writes for an unusable or unknown quota: %s",
+    async (limit) => {
+      const f = fixture();
+      f.state.limit = limit;
+      await expect(activate(options, f.deps)).rejects.toThrow("concurrency");
+      expect(f.deps.deploy).not.toHaveBeenCalled();
+      expect(f.deps.confirm).not.toHaveBeenCalled();
+      expect(f.writes()).toEqual([]);
+    },
+  );
+  it("keeps reservation at the 105-unit boundary", async () => {
     const f = fixture();
-    f.state.limit = 104;
-    await expect(activate(options, f.deps)).rejects.toThrow("concurrency");
+    f.state.limit = 105;
+    await activate(options, f.deps);
+    expect(f.deps.deploy).toHaveBeenCalledWith(
+      expect.objectContaining({ lambdaConcurrency: "reserved" }),
+    );
+  });
+  it("reuses a shared stack without changing its capacity or reading account quotas", async () => {
+    const f = fixture();
+    f.state.exists = true;
+    f.outputs.LambdaConcurrencyMode = "shared";
+    expect((await activate(options, f.deps)).mode).toBe("DEPLOYED");
     expect(f.deps.deploy).not.toHaveBeenCalled();
+    expect(
+      f.deps.aws.mock.calls.some((c) => c[1] === "get-account-settings"),
+    ).toBe(false);
+  });
+  it("requires a new review when the selected capacity mode changes during confirmation", async () => {
+    const f = fixture();
+    f.deps.confirm.mockImplementation(async () => {
+      f.state.limit = 10;
+      return true;
+    });
+    await expect(activate(options, f.deps)).rejects.toThrow(
+      "เปลี่ยนระหว่างยืนยัน",
+    );
+    expect(f.deps.deploy).not.toHaveBeenCalled();
+    expect(f.writes()).toEqual([]);
+  });
+  it("refuses a deployment result with a different capacity mode", async () => {
+    const f = fixture();
+    f.state.limit = 10;
+    f.deps.deploy.mockImplementation(async () => {
+      f.state.exists = true;
+      f.outputs.LambdaConcurrencyMode = "reserved";
+    });
+    await expect(activate(options, f.deps)).rejects.toThrow(
+      "โหมด Lambda หลัง deploy",
+    );
     expect(f.writes()).toEqual([]);
   });
   it.each(["true", ""])(
@@ -352,7 +421,13 @@ describe("guided AWS activation", () => {
   });
   it("uses the reviewed account/profile and keeps IAM review plus public intake closed", () => {
     const commands = cdkArguments(
-      { account, region, backend: "CREATE", bootstrap: true },
+      {
+        account,
+        region,
+        backend: "CREATE",
+        bootstrap: true,
+        lambdaConcurrency: "shared",
+      },
       "studio",
     );
     expect(commands.bootstrap).toContain(`aws://${account}/${region}`);
@@ -361,6 +436,7 @@ describe("guided AWS activation", () => {
         "stage=staging",
         "intakeEnabled=false",
         "legalReady=false",
+        "lambdaConcurrency=shared",
         "--require-approval",
         "broadening",
         "--profile",

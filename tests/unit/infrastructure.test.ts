@@ -64,6 +64,7 @@ describe("AWS foundation safeguards", () => {
     template.hasOutput("AuditTable", { Value: Match.anyValue() });
     template.hasOutput("AppOrigin", { Value: options.appOrigin });
     template.hasOutput("IntakeEnabled", { Value: "false" });
+    template.hasOutput("LambdaConcurrencyMode", { Value: "reserved" });
     template.hasResourceProperties("AWS::ApiGatewayV2::Route", {
       RouteKey: "POST /api/v1/leads",
       AuthorizationType: "NONE",
@@ -125,5 +126,55 @@ describe("AWS foundation safeguards", () => {
     ]);
     expect(JSON.stringify(provision[0].Resource)).toContain("Fn::GetAtt");
     expect(JSON.stringify(provision[0].Resource)).not.toContain("*");
+  });
+  it("supports low-quota private staging without a Lambda reservation and with lower route throttles", () => {
+    const template = Template.fromStack(
+      new FoundationStack(new App(), "SharedStaging", {
+        ...options,
+        stage: "staging",
+        appOrigin: "https://studio.example",
+        lambdaConcurrency: "shared",
+      }),
+    );
+    template.hasResourceProperties("AWS::Lambda::Function", {
+      ReservedConcurrentExecutions: Match.absent(),
+      Environment: { Variables: Match.objectLike({ INTAKE_ENABLED: "false" }) },
+    });
+    template.hasResourceProperties("AWS::ApiGatewayV2::Stage", {
+      DefaultRouteSettings: { ThrottlingBurstLimit: 5, ThrottlingRateLimit: 2 },
+    });
+    template.hasResourceProperties("AWS::Cognito::UserPool", {
+      MfaConfiguration: "ON",
+    });
+    template.hasResourceProperties("AWS::ApiGatewayV2::Route", {
+      RouteKey: "GET /api/v1/admin/leads",
+      AuthorizationType: "JWT",
+    });
+    template.hasOutput("LambdaConcurrencyMode", { Value: "shared" });
+  });
+  it("keeps shared capacity out of production, public intake and dev", () => {
+    const shared = {
+      ...options,
+      appOrigin: "https://studio.example",
+      lambdaConcurrency: "shared" as const,
+    };
+    expect(() => validateOptions(shared)).toThrow("only supported for staging");
+    expect(() =>
+      validateOptions({
+        ...shared,
+        stage: "staging",
+        intakeEnabled: true,
+        legalReady: true,
+      }),
+    ).toThrow("only supported for staging");
+    expect(() =>
+      validateOptions({
+        ...shared,
+        stage: "prod",
+        legalReady: true,
+        budgetEmail: "ops@example.test",
+        budgetUsd: 25,
+      }),
+    ).toThrow("only supported for staging");
   });
 });

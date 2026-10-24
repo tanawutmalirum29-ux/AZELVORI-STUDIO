@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
 import { awsCli, AwsFailure, setupAdmin, type AwsCall } from "./admin-setup";
+import type { LambdaConcurrencyMode } from "../infrastructure/cdk/app";
 
 export const target = {
   appId: "d3uhwi8blbgrci",
@@ -62,6 +63,17 @@ const StackSchema = z.object({
   Tags: z.array(z.object({ Key: z.string(), Value: z.string() })).default([]),
 });
 type CloudStack = z.infer<typeof StackSchema>;
+function stackConcurrencyMode(stack: CloudStack): LambdaConcurrencyMode {
+  // Older activation templates always reserved 5 and did not publish this output.
+  const mode =
+    stack.Outputs.find((o) => o.OutputKey === "LambdaConcurrencyMode")
+      ?.OutputValue ?? "reserved";
+  if (mode !== "reserved" && mode !== "shared")
+    throw new Error(
+      "LambdaConcurrencyMode ของ stack ไม่ถูกต้อง; ตรวจ backend ก่อนรันใหม่",
+    );
+  return mode;
+}
 const settled = new Set([
   "CREATE_COMPLETE",
   "UPDATE_COMPLETE",
@@ -224,21 +236,37 @@ async function inspect(options: ActivationOptions, aws: AwsCall) {
       );
   }
   let bootstrap = false;
+  let lambdaConcurrency = stack
+    ? stackConcurrencyMode(stack)
+    : ("reserved" as LambdaConcurrencyMode);
+  let unreservedConcurrency: number | undefined;
   if (!stack) {
     const toolkit = await readStack(aws, "CDKToolkit");
     if (toolkit) verifyStack(toolkit, "CDKToolkit", account, options.region);
     bootstrap = !toolkit;
     const limits = (await aws("lambda", "get-account-settings", {}))
       .AccountLimit as { UnreservedConcurrentExecutions?: number } | undefined;
-    if (
-      typeof limits?.UnreservedConcurrentExecutions !== "number" ||
-      limits.UnreservedConcurrentExecutions < 105
-    )
+    const quota = z
+      .number()
+      .int()
+      .positive()
+      .safeParse(limits?.UnreservedConcurrentExecutions);
+    if (!quota.success)
       throw new Error(
-        "Lambda concurrency ยังไม่พอสำหรับจอง 5 และเหลือ unreserved 100; ขอเพิ่ม quota ใน region นี้ก่อน ยังไม่สร้างทรัพยากร",
+        "อ่าน Lambda concurrency ที่ใช้งานได้ไม่สำเร็จหรือ quota เป็น 0; ตรวจ Lambda GetAccountSettings ใน region นี้ก่อน ยังไม่สร้างทรัพยากร",
       );
+    unreservedConcurrency = quota.data;
+    lambdaConcurrency = quota.data >= 105 ? "reserved" : "shared";
   }
-  return { account, stack, bootstrap, appEnv, branchEnv };
+  return {
+    account,
+    stack,
+    bootstrap,
+    appEnv,
+    branchEnv,
+    lambdaConcurrency,
+    unreservedConcurrency,
+  };
 }
 type Inspection = Awaited<ReturnType<typeof inspect>>;
 export type ActivationPlan = {
@@ -247,6 +275,8 @@ export type ActivationPlan = {
   email?: string;
   backend: "CREATE" | "REUSE";
   bootstrap: boolean;
+  lambdaConcurrency: LambdaConcurrencyMode;
+  unreservedConcurrency?: number;
 };
 type Dependencies = {
   aws: AwsCall;
@@ -257,7 +287,7 @@ type Dependencies = {
   report: (message: string) => void;
   pollAttempts?: number;
 };
-function sameEnvironment(a: Inspection, b: Inspection) {
+function sameConfiguration(a: Inspection, b: Inspection) {
   // Do not print the snapshots: unrelated environment values can be secrets.
   const signature = (value: Record<string, string>) =>
     JSON.stringify(
@@ -265,6 +295,7 @@ function sameEnvironment(a: Inspection, b: Inspection) {
     );
   return (
     a.account === b.account &&
+    a.lambdaConcurrency === b.lambdaConcurrency &&
     signature(a.appEnv) === signature(b.appEnv) &&
     signature(a.branchEnv) === signature(b.branchEnv)
   );
@@ -279,6 +310,8 @@ export async function activate(options: ActivationOptions, deps: Dependencies) {
     email: options.email,
     backend: before.stack ? "REUSE" : "CREATE",
     bootstrap: before.bootstrap,
+    lambdaConcurrency: before.lambdaConcurrency,
+    unreservedConcurrency: before.unreservedConcurrency,
   };
   deps.report(
     JSON.stringify(
@@ -298,7 +331,7 @@ export async function activate(options: ActivationOptions, deps: Dependencies) {
   if (!(await deps.confirm(plan))) return { mode: "CANCELLED" };
   const fresh = await inspect(options, deps.aws);
   if (
-    !sameEnvironment(before, fresh) ||
+    !sameConfiguration(before, fresh) ||
     before.stack?.StackId !== fresh.stack?.StackId ||
     before.bootstrap !== fresh.bootstrap
   )
@@ -313,6 +346,10 @@ export async function activate(options: ActivationOptions, deps: Dependencies) {
   if (!stack)
     throw new Error("ยังไม่พบ backend หลัง deploy; หยุดก่อนสร้างบัญชี");
   verifyStack(stack, target.stack, plan.account, options.region);
+  if (stackConcurrencyMode(stack) !== plan.lambdaConcurrency)
+    throw new Error(
+      "โหมด Lambda หลัง deploy ไม่ตรงกับแผนที่ยืนยัน; หยุดก่อนสร้างบัญชี",
+    );
   const frontend = frontendFromStack(stack, options.region, plan.account);
   const health = z
     .object({
@@ -346,7 +383,7 @@ export async function activate(options: ActivationOptions, deps: Dependencies) {
   );
   const current = await inspect(options, deps.aws);
   if (
-    !sameEnvironment(before, current) ||
+    !sameConfiguration(before, current) ||
     current.stack?.StackId !== stack.StackId
   )
     throw new Error(
@@ -362,7 +399,7 @@ export async function activate(options: ActivationOptions, deps: Dependencies) {
     });
     const verified = await inspect(options, deps.aws);
     if (
-      !sameEnvironment(
+      !sameConfiguration(
         { ...current, branchEnv: environmentVariables },
         verified,
       ) ||
@@ -443,6 +480,8 @@ export function cdkArguments(plan: ActivationPlan, profile?: string) {
       "intakeEnabled=false",
       "-c",
       "legalReady=false",
+      "-c",
+      `lambdaConcurrency=${plan.lambdaConcurrency}`,
       "--require-approval",
       "broadening",
       ...shared,
@@ -484,6 +523,11 @@ async function main() {
     aws: awsCli(options),
     report: console.log,
     confirm: async (plan) => {
+      console.log(
+        plan.lambdaConcurrency === "shared"
+          ? "Lambda: ใช้โควตาส่วนกลางที่มีอยู่สำหรับ staging ไม่จองเพิ่ม; API ตั้งเป้า 2 คำขอ/วินาทีต่อเส้นทาง burst 5 (best effort ไม่ใช่เพดานค่าใช้จ่าย)\nยังปิดรับบรีฟสาธารณะ ต้องเปลี่ยนเป็น reserved ก่อนเปิดรับงาน"
+          : "Lambda: จองได้พร้อมกัน 5 งาน; API ตั้งเป้า 10 คำขอ/วินาทีต่อเส้นทาง burst 20",
+      );
       console.log(
         `แผนนี้${plan.backend === "CREATE" ? "สร้าง API, Cognito, DynamoDB 2 ตาราง, logs และ IAM role" : "ใช้ backend เดิม"} และเชื่อมเว็บ main\n${plan.bootstrap ? "จะสร้าง CDKToolkit รวม bucket และ roles สำหรับ deploy ในบัญชีนี้ด้วย\n" : ""}ทรัพยากร AWS มีค่าใช้จ่ายตามการใช้งาน ไม่มีการกำหนดเพดานค่าใช้จ่ายในขั้นนี้\nตรวจ Account, Region และอีเมลด้านบน ห้ามแก้ Amplify พร้อมกันระหว่างรัน`,
       );
