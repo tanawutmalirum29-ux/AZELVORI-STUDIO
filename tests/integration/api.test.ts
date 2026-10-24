@@ -190,6 +190,25 @@ describe("HTTP integration / public and admin boundaries", () => {
       expect(result.body).not.toContain(validLead.contactEmail);
     },
   );
+  it("accepts native Cognito scope for verified founder CRM but not a customer", async () => {
+    const r = new MemoryRepository(), h = createHandler(r, config);
+    r.staff.set("founder", {
+      userId: "founder", role: "FOUNDER_ADMIN", active: true,
+    });
+    const nativeClaims = { ...staffClaims, scope: "aws.cognito.signin.user.admin" };
+    expect((await h(event("/api/v1/admin/leads", "GET", {}, nativeClaims))).statusCode).toBe(200);
+    expect((await h(event("/api/v1/admin/leads", "GET", {}, {
+      ...nativeClaims, sub: "customer-a",
+    }))).statusCode).toBe(403);
+    expect((await h(event("/api/v1/admin/leads", "GET", {}, {
+      ...nativeClaims, token_use: "id",
+    }))).statusCode).toBe(401);
+    expect((await h(event("/api/v1/admin/leads", "GET", {}, {
+      ...nativeClaims, scope: "aws.cognito.signin.user.admin-unauthorized",
+    }))).statusCode).toBe(401);
+    r.staff.get("founder")!.active = false;
+    expect((await h(event("/api/v1/admin/leads", "GET", {}, nativeClaims))).statusCode).toBe(403);
+  });
   it("rechecks revoked staff grants on every request", async () => {
     const r = new MemoryRepository(),
       h = createHandler(r, config);

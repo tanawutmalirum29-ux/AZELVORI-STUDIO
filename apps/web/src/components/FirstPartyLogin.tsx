@@ -61,7 +61,7 @@ export function FirstPartyLogin({ mode, denied = false, reason = "" }: {
     } catch (failure) {
       if (failure instanceof ApiError && [401, 403].includes(failure.status)) {
         await logoutNative();
-        throw new Error("AWS API ยังไม่รองรับหน้าล็อกอินใหม่ กรุณาใช้เข้าสู่ระบบผ่าน Cognito ชั่วคราว");
+        throw new Error("ระบบ API ปฏิเสธการยืนยันตัวตน กรุณาลองเข้าสู่ระบบใหม่ หรือใช้ Amazon Cognito ชั่วคราว");
       }
       throw failure;
     }

@@ -1,5 +1,6 @@
 import { parseBody } from "./request";
 import { workspaceRoute } from "./workspace-http";
+import { hasValidatedAccessClaims } from "./access-claims";
 import type { WorkspaceService } from "./workspace";
 import type {
   APIGatewayProxyEventV2,
@@ -96,13 +97,7 @@ export function createHandler(repo: Repository, config: ApiConfig) {
             authorizer?: { jwt?: { claims?: Record<string, unknown> } };
           }
         ).authorizer?.jwt?.claims;
-        const scopes =
-          typeof jwt?.scope === "string" ? jwt.scope.split(" ") : [];
-        if (
-          typeof jwt?.sub !== "string" ||
-          jwt.token_use !== "access" ||
-          !scopes.includes("azelvori/access")
-        )
+        if (!hasValidatedAccessClaims(jwt))
           throw new HttpError(401, "UNAUTHENTICATED", "กรุณาเข้าสู่ระบบใหม่");
         await authorizeStaff(repo, jwt.sub);
         if (path === "/api/v1/admin/leads" && method === "GET")
