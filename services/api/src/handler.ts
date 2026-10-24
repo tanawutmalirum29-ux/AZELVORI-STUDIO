@@ -19,7 +19,7 @@ const workspaceStore = new DynamoWorkspaceStore(table, audit);
 export const handler = createHandler(repository, {
   intakeEnabled: process.env.INTAKE_ENABLED === "true",
   allowedOrigin: origin,
-  employees: new EmployeeService(workspaceStore, repository, table, staffPool),
+  employees: new EmployeeService(workspaceStore, repository, table, staffPool, audit),
   employeeConfig: { poolId: staffPool, clientId: staffClient, region: process.env.AWS_REGION ?? "ap-southeast-2" },
   workspace: new WorkspaceService(
     workspaceStore,
