@@ -13,7 +13,7 @@ export const employeeInput = z.object({
   nickname: z.string().trim().min(1).max(40),
 }).strict();
 export type Employee = {
-  key: string; userId: string; firstName: string; lastName: string;
+  key: string; userId: string; role: "EMPLOYEE"; firstName: string; lastName: string;
   nickname: string; active: boolean; version: number; createdAt: string;
   revokedAt?: string;
 };
@@ -73,7 +73,7 @@ export class EmployeeService {
         UserPoolId: this.pool, Username: username, Password: password, Permanent: true,
       }));
       const employee: Employee = {
-        key, userId: sub, ...parsed.data, active: true,
+        key, userId: sub, role: "EMPLOYEE", ...parsed.data, active: true,
         version: 1, createdAt: new Date().toISOString(),
       };
       const saved = await this.store.commit({
