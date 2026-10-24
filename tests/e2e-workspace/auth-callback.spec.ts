@@ -111,25 +111,21 @@ async function provider(page: Page) {
   };
 }
 
-test("callback exchanges once, offers continuation during slow navigation, and opens admin", async ({
+test("callback exchanges once and its continuation link recovers an interrupted navigation", async ({
   page,
 }, info) => {
   const identity = await provider(page);
   await page.goto("/admin/login");
   const callback = await identity.begin();
-  let continueNavigation!: () => void;
-  const navigationGate = new Promise<void>((resolve) => {
-    continueNavigation = resolve;
-  });
-  await page.route("**/admin", async (route) => {
-    await navigationGate;
-    await route.continue();
-  });
+  // Abort only the automatic navigation, as if the user pressed Stop on a
+  // stalled load. Holding it open deadlocks Playwright's navigation auto-wait.
+  // The visible continuation link must then perform a real, successful retry.
+  await page.route("**/admin", (route) => route.abort("aborted"), { times: 1 });
   await page.goto(callback);
   await expect(
     page.getByRole("heading", { name: "กำลังยืนยันบัญชี…" }),
   ).toBeVisible();
-  expect(new URL(page.url()).search).toBe("");
+  await expect(page).toHaveURL(/\/auth\/callback$/);
   identity.release();
   await expect(
     page.getByRole("heading", { name: "ยืนยันบัญชีแล้ว" }),
@@ -141,7 +137,7 @@ test("callback exchanges once, offers continuation during slow navigation, and o
     path: info.outputPath("callback-confirmed.png"),
     fullPage: true,
   });
-  continueNavigation();
+  await page.getByRole("link", { name: "เปิดหน้าแอดมิน", exact: true }).click();
   await expect(page).toHaveURL(/\/admin$/);
   await expect(
     page.getByRole("heading", { name: "บรีฟและคิวงาน" }),
