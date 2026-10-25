@@ -153,7 +153,10 @@ export async function accessToken(): Promise<string> {
         return renewed.access_token;
       })
       .catch(async (error: unknown) => {
-        if (error instanceof Error && ["invalid_grant", "NotAuthorizedException"].includes(error.name)) {
+        const denial = error as { error?: string; name?: string; message?: string } | null;
+        if (denial && (denial.error === "invalid_grant" ||
+            denial.name === "invalid_grant" || denial.message === "invalid_grant" ||
+            denial.name === "NotAuthorizedException")) {
           await auth().removeUser();
           throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
         }
