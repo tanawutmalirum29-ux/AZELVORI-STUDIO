@@ -90,6 +90,7 @@ const liveTerms: [string, string][] = [
 ];
 export function Legal({ path }: { path: string }) {
   const doc = documents[path] ?? documents["/terms"];
+  const title = intakeEnabled && path === "/terms" ? "เงื่อนไขการใช้บริการและส่งบรีฟ" : doc.title;
   const sections = intakeEnabled && path === "/privacy"
     ? [...livePrivacy, ...doc.sections.filter(([title]) =>
       !["สถานะของเว็บไซต์", "ก่อนเปิดให้บริการจริง"].includes(title))]
@@ -98,7 +99,7 @@ export function Legal({ path }: { path: string }) {
       : doc.sections;
   return (
     <article className="container legal-page">
-      <PageIntro eyebrow={intakeEnabled ? "AZELVORI / OPEN FOR BRIEFS" : "TRANSPARENCY / DEVELOPMENT PREVIEW"} title={doc.title}>
+      <PageIntro eyebrow={intakeEnabled ? "AZELVORI / OPEN FOR BRIEFS" : "TRANSPARENCY / DEVELOPMENT PREVIEW"} title={title}>
         {intakeEnabled
           ? "อัปเดต 25 ตุลาคม 2026 · เปิดรับบรีฟจริง ยังไม่รับชำระเงินออนไลน์"
           : "อัปเดต 23 ตุลาคม 2026 · ข้อความสำหรับรุ่นพัฒนา ต้องตรวจสอบก่อนเปิดบริการจริง"}
