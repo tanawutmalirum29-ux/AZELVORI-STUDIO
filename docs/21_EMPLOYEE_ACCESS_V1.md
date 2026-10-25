@@ -4,10 +4,10 @@
 
 - Only an active FOUNDER_ADMIN can issue employee accounts at /admin/employees.
 - Employee records require first name, surname and nickname to identify each credential owner.
-- Key starts at 00001, increments atomically and never wraps back to 00001; after 99999 the next key is 100000. The counter is retained forever and intentionally has **no TTL**. Revoked keys are retained for audit.
-- Initial password is a strong random secret with a unique never-reused key embedded in the string. The password is displayed to the founder *once* and is NEVER persisted in the operations table. Do not screenshot or share publicly.
-- Employee credentials have no scheduled account expiry. However access tokens and browser sessions expire/refresh as usual for authentication security.
-- Disabling a credential via founder UI marks its grant inactive with DynamoDB transaction checks and then disables Cognito. This blocks work/chat APIs immediately even for existing access tokens. Reopening disabled credentials is intentionally unsupported.
+- New keys start at 00001, increment atomically and expand after 99999 to 100000. The **key itself can be reused only after its current employee is disabled**, using the founder's “นำคีย์กลับมาใช้” action; the original issuance and previous employee subject remain permanently revoked. The new-key counter is retained, with no TTL.
+- Every credential issuance (new key or reused key) consumes a distinct persistent, atomic issuance counter that is NEVER reset. Passwords use a new `AZb-{issuance}-{key}-{random}` format; every new password is globally unique even if random bytes collide. Former `AZa-` passwords can never collide because they have a different prefix. Password appears to the founder once and is NEVER persisted as plaintext.
+- Employee keys are reusable slots with no scheduled account expiry; credentials and browser sessions still expire/refresh as usual. Reuse requires deliberate founder action, not automatic reopening.
+- Disabling the current credential makes that Cognito identity and its old password unusable. The founder can then reassign the *same key* to a fresh employee, **creating a new Cognito identity/sub and password**. Old tokens cannot inherit the replacement grant. Reissue uses a conditional directory write so simultaneous attempts cannot activate two users with the same key. Re-enabling the former identity is never supported.
 - Employees sign in at /staff/login, use /staff/inbox. Staff are allowed to list customer projects, see project messages, send messages, and **acknowledge NEW leads**. Employees cannot issue credentials, grant access, approve contracts/milestones, create projects, read founder private comments or change prices.
 - The staff and founder/customer Cognito user pools are separate. Each staff API route has its own JWT issuer/audience and only accepts reserved Cognito access scope. A staff login token cannot call founder/customer API routes.
 - Employee messages are marked STUDIO in the customer-facing project chat. They are auditable with the employee's Cognito subject.
@@ -30,7 +30,7 @@ After CI passes:
 
 Employee chat uses existing saved project conversations with 15-second visible-tab polling, not a real-time WebSocket. Leads can be marked ACKNOWLEDGED by staff but no auto-approval of business contracts is enabled. All active employees in V1 can view the project's shared customer conversation and intake queue; per-assignee routing and granular employee roles are future work.
 
-If the generated password is lost, there is intentionally no self-service password recovery for employee keys (no employee email is collected). The founder should disable that key and issue a new one. Revoked keys must never be recycled. The first five digits are the *employee key*, not a five-digit password: that would be too weak for real staff accounts.
+If the generated password is lost, there is no self-service password recovery for employee keys (no employee email is collected). The founder should disable that credential and **reissue the same key** with a new globally unique password. Historical passwords and Cognito subjects must never be reused. The first five digits are the *employee key*, not a five-digit password: that would be too weak for real staff accounts.
 
 ## QA
 

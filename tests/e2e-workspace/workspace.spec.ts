@@ -107,6 +107,9 @@ async function setup(page: Page, staff = false, verified = true) {
     crmUnavailable: false,
     crmForbidden: false,
     adminRequests: [] as string[],
+    employees: [] as Array<{ key: string; userId: string; role: "EMPLOYEE";
+      firstName: string; lastName: string; nickname: string; active: boolean;
+      version: number; createdAt: string; revokedAt?: string }>,
   };
   await page.route("https://api.example.test/**", async (route) => {
     const request = route.request(),
@@ -140,6 +143,35 @@ async function setup(page: Page, staff = false, verified = true) {
       expect(request.postDataJSON().token).toBe(token);
       state.acceptedInvite = true;
       return send(state.project);
+    }
+    if (path === "/admin/employees" && method === "GET")
+      return send({ items: state.employees });
+    if (path === "/admin/employees" && method === "POST") {
+      const person = request.postDataJSON();
+      const employee = { ...person, key: "00002", userId: "new-staff",
+        role: "EMPLOYEE" as const, active: true, version: 1, createdAt: date };
+      state.employees.push(employee);
+      return send({ employee, password: "AZb-8-00002-random-unique-secret" }, 201);
+    }
+    if (path.startsWith("/admin/employees/") && method === "POST") {
+      const parts = path.split("/");
+      const key = parts[3];
+      const old = state.employees.find(e => e.key === key);
+      if (!old) return fail(404, "ไม่พบคีย์พนักงาน");
+      if (parts[4] === "reissue") {
+        if (old.active) return fail(409, "คีย์ยังเปิดใช้งานอยู่");
+        const person = request.postDataJSON();
+        const employee = { ...person, key, userId: "replacement-sub",
+          role: "EMPLOYEE" as const, active: true, version: old.version + 1,
+          createdAt: date };
+        state.employees = state.employees.map(e => e.key === key ? employee : e);
+        return send({ employee, password: "AZb-9-00001-strong-unique-secret" }, 201);
+      }
+      if (parts[4] === "revoke") {
+        const employee = { ...old, active: false, version: old.version + 1, revokedAt: date };
+        state.employees = state.employees.map(e => e.key === key ? employee : e);
+        return send({ employee });
+      }
     }
     if (path.startsWith("/admin/leads")) {
       state.adminRequests.push(`${method} ${path}`);
@@ -252,6 +284,35 @@ async function layout(page: Page, info: TestInfo, name: string) {
     fullPage: true,
   });
 }
+test("founder reissues a disabled employee key with a new password and no old account reuse", async ({ page }, info) => {
+  const state = await setup(page, true);
+  state.employees.push({
+    key: "00001", userId: "retired-sub", role: "EMPLOYEE",
+    firstName: "อดีต", lastName: "พนักงาน", nickname: "เก่า",
+    active: false, version: 2, createdAt: date, revokedAt: date,
+  });
+  await page.goto("/admin/employees");
+  await expect(page.getByRole("heading", { name: "จัดการบัญชีพนักงาน" })).toBeVisible();
+  await page.getByRole("button", { name: "นำคีย์ 00001 กลับมาใช้" }).click();
+  await expect(page.getByRole("heading", { name: "ออกบัญชีใหม่ด้วยคีย์ 00001" })).toBeVisible();
+  await page.getByLabel("ชื่อจริง").fill("สมหญิง");
+  await page.getByLabel("นามสกุล").fill("ทดลอง");
+  await page.getByLabel("ชื่อเล่น").fill("ใหม่");
+  await page.getByRole("button", { name: "ออกคีย์เดิมพร้อมรหัสผ่านใหม่" }).click();
+  await expect(page.getByLabel("คีย์พนักงานที่สร้าง")).toHaveValue("00001");
+  await expect(page.getByLabel("รหัสผ่านพนักงานที่สร้าง"))
+    .toHaveValue("AZb-9-00001-strong-unique-secret");
+  expect(state.employees).toHaveLength(1);
+  expect(state.employees[0]).toMatchObject({
+    key: "00001", userId: "replacement-sub", firstName: "สมหญิง", active: true,
+  });
+  await page.getByRole("button", { name: "รับทราบและสร้างบัญชีถัดไป" }).click();
+  await expect(page.getByText("ใหม่ — สมหญิง ทดลอง")).toBeVisible();
+  await expect(page.getByRole("button", { name: "นำคีย์ 00001 กลับมาใช้" })).toHaveCount(0);
+  expect((await new AxeBuilder({page}).withTags(["wcag2a","wcag2aa","wcag21aa"]).analyze()).violations).toEqual([]);
+  await layout(page, info, "employee-reissued-key");
+});
+
 test("founder inbox replies, retries without duplicates and reloads saved messages", async ({
   page,
 }, info) => {

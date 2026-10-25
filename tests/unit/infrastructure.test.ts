@@ -153,6 +153,10 @@ describe("AWS foundation safeguards", () => {
       RouteKey: "POST /api/v1/admin/employees", AuthorizationType: "JWT",
       AuthorizationScopes: ["azelvori/access", "aws.cognito.signin.user.admin"],
     });
+    template.hasResourceProperties("AWS::ApiGatewayV2::Route", {
+      RouteKey: "POST /api/v1/admin/employees/{key}/reissue", AuthorizationType: "JWT",
+      AuthorizationScopes: ["azelvori/access", "aws.cognito.signin.user.admin"],
+    });
     template.hasOutput("EmployeePoolId", { Value: Match.anyValue() });
     template.hasOutput("EmployeeClientId", { Value: Match.anyValue() });
   });

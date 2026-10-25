@@ -281,6 +281,12 @@ export class FoundationStack extends Stack {
       authorizationScopes: ["azelvori/access", "aws.cognito.signin.user.admin"],
     });
     api.addRoutes({
+      path: "/api/v1/admin/employees/{key}/reissue",
+      methods: [apigateway.HttpMethod.POST],
+      integration, authorizer: jwt,
+      authorizationScopes: ["azelvori/access", "aws.cognito.signin.user.admin"],
+    });
+    api.addRoutes({
       path: "/api/v1/admin/employees/{key}/revoke",
       methods: [apigateway.HttpMethod.POST],
       integration, authorizer: jwt,

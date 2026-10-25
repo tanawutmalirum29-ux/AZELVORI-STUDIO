@@ -92,3 +92,60 @@ test("employee login is separate from the founder administration",async({page})=
   await expect(page.getByRole("link",{name:"เข้าสู่ระบบผู้ดูแล"})).toHaveCount(0);
   await expect(page.getByRole("textbox",{name:"คีย์พนักงาน"})).toBeVisible();
 });
+
+
+test("a reused employee key signs in as a new identity; old key/password pairing is rejected", async ({ page }) => {
+  const authRequests: string[] = [];
+  await page.route("https://cognito-idp.ap-southeast-2.amazonaws.com/**", async route => {
+    const target = route.request().headers()["x-amz-target"] ?? "";
+    if (route.request().method() === "OPTIONS") return route.fulfill({
+      status: 204, headers: {
+        "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "*",
+        "Access-Control-Allow-Methods": "POST,OPTIONS",
+      },
+    });
+    if (target.endsWith("RevokeToken")) return route.fulfill({
+      headers: { "Access-Control-Allow-Origin": "*" },
+      contentType: "application/x-amz-json-1.1", body: "{}",
+    });
+    const input = route.request().postDataJSON() as { AuthParameters?: { USERNAME: string } };
+    authRequests.push(input.AuthParameters?.USERNAME ?? "");
+    return route.fulfill({
+      headers: { "Access-Control-Allow-Origin": "*" },
+      contentType: "application/x-amz-json-1.1",
+      body: JSON.stringify({ AuthenticationResult: {
+        AccessToken: "reissued-access", RefreshToken: "reissued-refresh", ExpiresIn: 300,
+      } }),
+    });
+  });
+  await page.route("https://api.example.test/**", async route => {
+    const headers = { "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET,OPTIONS", "Access-Control-Allow-Headers": "*" };
+    if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers });
+    const path = new URL(route.request().url()).pathname;
+    if (path === "/api/v1/employee/config") return route.fulfill({ headers,
+      contentType: "application/json", body: JSON.stringify({
+        poolId: "ap-southeast-2_TEST", clientId: "employee-client", region: "ap-southeast-2",
+      }) });
+    if (path === "/api/v1/employee/me") return route.fulfill({ headers,
+      contentType: "application/json", body: JSON.stringify({
+        userId: "new-employee-sub", key: "00001", nickname: "ใหม่",
+        firstName: "ใหม่", lastName: "ทดสอบ", role: "EMPLOYEE", active: true,
+      }) });
+    if (path === "/api/v1/employee/projects") return route.fulfill({ headers,
+      contentType: "application/json", body: JSON.stringify({ items: [] }) });
+    throw Error("Unexpected employee request: " + path);
+  });
+  await page.goto("/staff/login");
+  await page.getByLabel("คีย์พนักงาน").fill("00002");
+  await page.getByLabel("รหัสผ่าน").fill("AZb-3-00001-replacement-secret");
+  await page.getByRole("button", { name: "เข้าสู่พื้นที่พนักงาน" }).click();
+  await expect(page.getByText("คีย์พนักงานกับรหัสผ่านไม่ตรงกัน")).toBeVisible();
+  expect(authRequests).toEqual([]);
+  await page.getByLabel("คีย์พนักงาน").fill("00001");
+  await page.getByLabel("รหัสผ่าน").fill("AZb-3-00001-replacement-secret");
+  await page.getByRole("button", { name: "เข้าสู่พื้นที่พนักงาน" }).click();
+  await expect(page).toHaveURL(/\/staff\/inbox$/);
+  await expect(page.getByText("พื้นที่พนักงาน", {exact:false}).first()).toBeVisible();
+  expect(authRequests).toEqual(["emp-00001-v3"]);
+});

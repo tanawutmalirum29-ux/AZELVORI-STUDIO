@@ -38,10 +38,16 @@ export const employeeSessionExists = () => !!read();
 export function clearEmployeeSession() { sessionStorage.removeItem(SESSION_KEY); }
 export async function employeeLogin(key: string, password: string) {
   if (!/^\d{5,}$/.test(key)) throw new Error("รหัสพนักงานต้องเป็นตัวเลขอย่างน้อย 5 หลัก");
+  const issued = /^AZb-(\d+)-(\d{5,})-[A-Za-z0-9_-]+$/.exec(password);
+  if (password.startsWith("AZb-") && (!issued || issued[2] !== key))
+    throw new Error("คีย์พนักงานกับรหัสผ่านไม่ตรงกัน");
+  // Every new issuance has a distinct Cognito subject; legacy AZa credentials
+  // continue to authenticate using emp-{key} until explicitly disabled.
+  const username = issued ? "emp-" + key + "-v" + issued[1] : "emp-" + key;
   const { sdk, clientId } = await client();
   const result = await sdk.send(new InitiateAuthCommand({
     ClientId: clientId, AuthFlow: "USER_PASSWORD_AUTH",
-    AuthParameters: { USERNAME: "emp-" + key, PASSWORD: password },
+    AuthParameters: { USERNAME: username, PASSWORD: password },
   }));
   if (!result.AuthenticationResult?.AccessToken || !result.AuthenticationResult.RefreshToken ||
       !result.AuthenticationResult.ExpiresIn)

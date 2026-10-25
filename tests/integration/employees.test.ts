@@ -8,6 +8,7 @@ import { workspaceFixture } from "../workspace-fixtures";
 async function fixture(first = 0) {
   const f = await workspaceFixture();
   let sequence = first;
+  let issued = 0;
   const commands: { name: string; input: any }[] = [];
   let account = 0;
   const cognito = {
@@ -23,7 +24,10 @@ async function fixture(first = 0) {
   const db = {
     send: vi.fn(async (cmd: { constructor: { name: string }; input: any }) => {
       commands.push({ name: cmd.constructor.name, input: cmd.input });
-      if (cmd.constructor.name === "UpdateCommand") return { Attributes: { seq: ++sequence } };
+      if (cmd.constructor.name === "UpdateCommand") {
+        const id = cmd.input.Key.pk === "SEQUENCE#EMPLOYEE_CREDENTIAL" ? ++issued : ++sequence;
+        return { Attributes: { seq: id } };
+      }
       return {};
     }),
   } as unknown as DynamoDBDocumentClient;
@@ -54,6 +58,60 @@ describe("founder-issued employee credentials and access", () => {
     expect(c.employee.key).toBe("00003");
     expect(new Set([a.password,b.password,c.password]).size).toBe(3);
     expect((await f.employeeDirectory.list(f.founder)).items.find(x=>x.key==="00001")?.active).toBe(false);
+  });
+  it("reuses disabled key with globally fresh credential and a different Cognito subject", async () => {
+    const f = await fixture();
+    const first = await f.employeeDirectory.create(f.founder, f.input);
+    const second = await f.employeeDirectory.create(f.founder, { ...f.input, nickname: "นัท" });
+    const oldActor = { sub: first.employee.userId, token: "former-employee-jwt" };
+    expect(first.employee.loginUsername).toBe("emp-00001-v1");
+    expect(second.employee.loginUsername).toBe("emp-00002-v2");
+    await expect(f.employeeDirectory.reissue(f.founder, first.employee.key, f.input))
+      .rejects.toMatchObject({ status: 409, code: "EMPLOYEE_KEY_ACTIVE" });
+    const inactive = await f.employeeDirectory.revoke(f.founder, first.employee.key);
+    expect(inactive.employee.active).toBe(false);
+    const replacement = await f.employeeDirectory.reissue(f.founder, first.employee.key, {
+      firstName: "จิรา", lastName: "ทดสอบ", nickname: "พลอย",
+    });
+    expect(replacement.employee.key).toBe(first.employee.key);
+    expect(replacement.employee.userId).not.toBe(first.employee.userId);
+    expect(replacement.employee.loginUsername).toBe("emp-00001-v3");
+    expect(replacement.password).toContain("-3-00001-");
+    expect([first.password, second.password]).not.toContain(replacement.password);
+    await expect(f.employeeDirectory.active(oldActor)).rejects.toMatchObject({ status: 403 });
+    await expect(f.service.employeeProjects(oldActor)).rejects.toMatchObject({ status: 403 });
+    await expect(f.employeeDirectory.active({
+      sub: replacement.employee.userId, token: "new-employee-jwt",
+    })).resolves.toMatchObject({ active: true, nickname: "พลอย" });
+    const dir = (await f.employeeDirectory.list(f.founder)).items;
+    expect(dir).toHaveLength(2);
+    expect(dir.find(e => e.key === "00001")?.userId).toBe(replacement.employee.userId);
+    expect(f.store.audit.some(a => a.action === "employee.reissued" &&
+      a.formerUserId === first.employee.userId)).toBe(true);
+    expect(JSON.stringify([...f.store.rows.values()])).not.toContain(replacement.password);
+    await f.employeeDirectory.revoke(f.founder, replacement.employee.key);
+    const third = await f.employeeDirectory.reissue(f.founder, "00001", f.input);
+    expect(third.password).not.toBe(replacement.password);
+    expect(new Set([first.password,second.password,replacement.password,third.password]).size).toBe(4);
+    expect(third.employee.loginUsername).toBe("emp-00001-v4");
+    await expect(f.employeeDirectory.active({ sub: replacement.employee.userId, token: "revoked" }))
+      .rejects.toMatchObject({status:403});
+    expect(f.commands.filter(x => x.name === "AdminDisableUserCommand")
+      .map(x => x.input.Username)).toEqual(["emp-00001-v1","emp-00001-v1","emp-00001-v3","emp-00001-v3"]);
+  });
+  it("a raced reissue cannot reactivate a retired identity or overwrite current directory", async () => {
+    const f = await fixture();
+    const first = await f.employeeDirectory.create(f.founder, f.input);
+    await f.employeeDirectory.revoke(f.founder, first.employee.key);
+    f.store.beforeCommit = () => {
+      const directory = f.store.rows.get("EMPLOYEE_DIRECTORY\0KEY#00001");
+      if (directory) f.store.put({ ...directory, version: directory.version + 1 });
+    };
+    await expect(f.employeeDirectory.reissue(f.founder, "00001", f.input))
+      .rejects.toMatchObject({ status: 409 });
+    expect((await f.employeeDirectory.list(f.founder)).items[0].active).toBe(false);
+    expect(f.commands.at(-1)?.name).toBe("AdminDisableUserCommand");
+    expect(f.commands.at(-1)?.input.Username).toBe("emp-00001-v2");
   });
   it("expands key length after 99999 without recycling a single number", async () => {
     const f = await fixture(99998);
