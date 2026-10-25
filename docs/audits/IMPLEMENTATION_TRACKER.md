@@ -15,7 +15,7 @@
 - **Production verification:** NOT VERIFIED. Must check Amplify publishes the merged frontend and manually validate mobile clipboard permissions; no AWS/CDK deploy required for this frontend-only fix.
 
 ### PILOT-01 — Founder live pilot on AWS Staging
-- **Status: IN REVIEW, NOT DEPLOYED** — [Founder Live Pilot guide](../../docs/23_FOUNDER_LIVE_PILOT.md); PR with CI evidence required.
+- **Status: CODE MERGED / QA PASS; AWS DEPLOY NOT VERIFIED** — [PR #11](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/pull/11) merged at [`0bf1e84`](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/commit/0bf1e84c2b7392cab6edbc089a75e4a3cec45ac1); [PR SHA CI run 40168690843 PASS](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/actions/runs/40168690843). [CloudShell live pilot guide](../../docs/23_FOUNDER_LIVE_PILOT.md).
 - **What this enables:** Authenticated founder (validated JWT + server-side active founder grant) may create non-PII test leads in the **real DynamoDB** intake/CRM workflow while public intake remains disabled. Adds `/admin/pilot` checklist to exercise existing founder, staff, customer project, invitation, message and milestone paths with test identities.
 - **What it does NOT enable:** public intake, payment processing, file attachments, customer self-signup, legal release approval, realtime notifications; they remain explicitly unavailable.
 - **Rollout:** Existing `Azelvori-staging`, `pilotEnabled=true` with `intakeEnabled=false`, `legalReady=false`, `lambdaConcurrency=shared`; operator must review CDK diff and complete CloudShell deploy. Verify Amplify build from same main SHA. No live results claimed without actual operator test.
