@@ -15,6 +15,7 @@ export const employeeInput = z.object({
 export type Employee = {
   key: string; userId: string; role: "EMPLOYEE"; firstName: string; lastName: string;
   nickname: string; active: boolean; version: number; createdAt: string;
+  loginUsername?: string;
   revokedAt?: string;
 };
 export const employeeKey = (sub: string) => meta("EMPLOYEE#" + sub);
@@ -29,7 +30,7 @@ export class EmployeeService {
     private dynamo = DynamoDBDocumentClient.from(new DynamoDBClient({})),
   ) {}
   private async founder(actor: Actor) { await authorizeStaff(this.leads, actor.sub); }
-  /** Atomic persistent counter. Disabled and failed registrations never recycle numbers. */
+  /** New key counter grows forever. Reissued keys are selected explicitly by the founder. */
   private async nextNumber(): Promise<number> {
     const out = await this.dynamo.send(new UpdateCommand({
       TableName: this.table, Key: { pk: "SEQUENCE#EMPLOYEE", sk: "META" },
@@ -48,20 +49,44 @@ export class EmployeeService {
     const page = await this.store.page<Employee>("EMPLOYEE_DIRECTORY", "KEY#", cursor);
     return { items: page.items.map((item) => item.data), ...(page.nextCursor ? { nextCursor: page.nextCursor } : {}) };
   }
-  async create(actor: Actor, raw: unknown) {
-    await this.founder(actor);
-    const parsed = employeeInput.safeParse(raw);
-    if (!parsed.success)
-      throw new HttpError(422, "INVALID_EMPLOYEE", "กรอกชื่อ นามสกุล และชื่อเล่นพนักงานให้ครบ");
-    const key = String(await this.nextNumber()).padStart(5, "0");
-    // Embedding the non-recycled key makes generated passwords unique across all issues,
-    // independent of random collision probability. Never store password in DynamoDB.
-    const password = "AZa-" + key + "-" + randomBytes(22).toString("base64url");
-    const username = "emp-" + key;
+  /**
+   * A second durable, atomic sequence identifies EACH credential issuance,
+   * including reuse of an employee key. Never reset this counter.
+   * The AZb prefix does not overlap with previously issued AZa passwords.
+   */
+  private async nextIssue(): Promise<number> {
+    const out = await this.dynamo.send(new UpdateCommand({
+      TableName: this.table, Key: { pk: "SEQUENCE#EMPLOYEE_CREDENTIAL", sk: "META" },
+      UpdateExpression: "ADD #seq :one",
+      ExpressionAttributeNames: { "#seq": "seq" },
+      ExpressionAttributeValues: { ":one": 1 },
+      ReturnValues: "UPDATED_NEW",
+    }));
+    const value = out.Attributes?.seq;
+    if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1)
+      throw new Error("Employee credential sequence is not safe");
+    return value;
+  }
+
+  /**
+   * Create a new *Cognito user* per issuance. Re-enabling the old identity
+   * would let its previously-issued access tokens gain the new worker's grant.
+   */
+  private async issue(
+    actor: Actor, key: string, parsed: z.infer<typeof employeeInput>,
+    previous?: Awaited<ReturnType<WorkspaceStore["get<Employee>"]>>,
+  ) {
+    const issue = await this.nextIssue();
+    // Password is globally unique across newly issued credentials, even if
+    // randomness collides. An old AZa-... password can never equal AZb-....
+    const password = "AZb-" + issue + "-" + key + "-" + randomBytes(22).toString("base64url");
+    // The staff browser recovers the issue number from the password, not from
+    // a public key->username lookup API. Old AZa credentials still use emp-{key}.
+    const username = "emp-" + key + "-v" + issue;
     const created = await this.cognito.send(new AdminCreateUserCommand({
       UserPoolId: this.pool, Username: username, TemporaryPassword: password,
       MessageAction: "SUPPRESS",
-      UserAttributes: [{ Name: "name", Value: parsed.data.firstName + " " + parsed.data.lastName }],
+      UserAttributes: [{ Name: "name", Value: parsed.firstName + " " + parsed.lastName }],
     }));
     const sub = created.User?.Attributes?.find((a) => a.Name === "sub")?.Value;
     if (!sub) {
@@ -73,16 +98,33 @@ export class EmployeeService {
         UserPoolId: this.pool, Username: username, Password: password, Permanent: true,
       }));
       const employee: Employee = {
-        key, userId: sub, role: "EMPLOYEE", ...parsed.data, active: true,
-        version: 1, createdAt: new Date().toISOString(),
+        key, userId: sub, loginUsername: username, role: "EMPLOYEE",
+        ...parsed, active: true, version: (previous?.version ?? 0) + 1,
+        createdAt: new Date().toISOString(),
       };
+      // New subjects are unique. Existing directory records are updated only
+      // if still disabled with the same version, so two competing reissues
+      // cannot both activate. The losing Cognito identity gets disabled.
       const saved = await this.store.commit({
-        checks: [founderKey(actor.sub)],
-        puts: [row(employeeKey(sub), employee), row(listingKey(key), employee)],
-        audit: { pk: "EMPLOYEE#" + sub, sk: employee.createdAt + "#" + randomUUID(),
-          action: "employee.created", actor: actor.sub, target: key, at: employee.createdAt },
+        checks: [
+          founderKey(actor.sub),
+          ...(previous ? [check(previous, previous)] : []),
+        ],
+        puts: [
+          row(employeeKey(sub), employee, employee.version),
+          row(listingKey(key), employee, employee.version),
+        ],
+        audit: {
+          pk: "EMPLOYEE#" + sub, sk: employee.createdAt + "#" + randomUUID(),
+          action: previous ? "employee.reissued" : "employee.created",
+          actor: actor.sub, target: key, at: employee.createdAt,
+          ...(previous ? { formerUserId: previous.data.userId } : {}),
+        },
       });
-      if (!saved) throw new HttpError(409, "EMPLOYEE_CREATE_CONFLICT", "สิทธิ์หรือข้อมูลพนักงานเปลี่ยน กรุณาลองอีกครั้ง");
+      if (!saved)
+        throw new HttpError(409, "EMPLOYEE_CREATE_CONFLICT",
+          "คีย์ถูกใช้งานหรือข้อมูลเปลี่ยนแล้ว กรุณาโหลดรายการใหม่");
+      // Plaintext secret is returned only once; not persisted in our DB.
       return { employee, password };
     } catch (error) {
       await this.cognito.send(new AdminDisableUserCommand({
@@ -90,6 +132,29 @@ export class EmployeeService {
       })).catch(() => undefined);
       throw error;
     }
+  }
+  async create(actor: Actor, raw: unknown) {
+    await this.founder(actor);
+    const parsed = employeeInput.safeParse(raw);
+    if (!parsed.success)
+      throw new HttpError(422, "INVALID_EMPLOYEE", "กรอกชื่อ นามสกุล และชื่อเล่นพนักงานให้ครบ");
+    const key = String(await this.nextNumber()).padStart(5, "0");
+    return this.issue(actor, key, parsed.data);
+  }
+  /** Reassign a *disabled key* to a fresh employee, not the former Cognito account. */
+  async reissue(actor: Actor, key: string, raw: unknown) {
+    await this.founder(actor);
+    if (!/^\d{5,}$/.test(key))
+      throw new HttpError(404, "NOT_FOUND", "ไม่พบคีย์พนักงาน");
+    const parsed = employeeInput.safeParse(raw);
+    if (!parsed.success)
+      throw new HttpError(422, "INVALID_EMPLOYEE", "กรอกชื่อ นามสกุล และชื่อเล่นพนักงานให้ครบ");
+    const former = await this.store.get<Employee>(listingKey(key));
+    if (!former)
+      throw new HttpError(404, "NOT_FOUND", "ไม่พบคีย์พนักงาน");
+    if (former.data.active)
+      throw new HttpError(409, "EMPLOYEE_KEY_ACTIVE", "คีย์นี้ยังใช้งานอยู่ ต้องปิดก่อน");
+    return this.issue(actor, key, parsed.data, former);
   }
   async revoke(actor: Actor, code: string) {
     await this.founder(actor);
@@ -110,7 +175,7 @@ export class EmployeeService {
     if (!ok) throw new HttpError(409, "STALE_EMPLOYEE", "สถานะพนักงานถูกเปลี่ยนแล้ว");
     try {
       await this.cognito.send(new AdminDisableUserCommand({
-        UserPoolId: this.pool, Username: "emp-" + code,
+        UserPoolId: this.pool, Username: listing.data.loginUsername ?? "emp-" + code,
       }));
     } catch {
       // API authorization remains revoked immediately even if Cognito fails.
