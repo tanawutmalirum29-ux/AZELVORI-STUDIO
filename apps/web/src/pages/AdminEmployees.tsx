@@ -23,6 +23,9 @@ function EmployeeManager() {
   const [cursor, setCursor] = useState<string>();
   const [form, setForm] = useState({ firstName: "", lastName: "", nickname: "" });
   const [issued, setIssued] = useState<Issued>();
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [credentialsSaved, setCredentialsSaved] = useState(false);
+  const [copyMessage, setCopyMessage] = useState("");
   const [reuseKey, setReuseKey] = useState<string>();
   const [revokeKey, setRevokeKey] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -48,6 +51,9 @@ function EmployeeManager() {
         ? "/api/v1/admin/employees/" + encodeURIComponent(reuseKey) + "/reissue"
         : "/api/v1/admin/employees", "POST", form);
       setIssued(result);
+      setPasswordVisible(false);
+      setCredentialsSaved(false);
+      setCopyMessage("");
       setEmployees((list) => reuseKey
         ? list.map((row) => row.key === reuseKey ? result.employee : row)
         : [result.employee, ...list]);
@@ -55,6 +61,29 @@ function EmployeeManager() {
       setForm({ firstName: "", lastName: "", nickname: "" });
     } catch (e) { setError(e instanceof Error ? e.message : "สร้างพนักงานไม่สำเร็จ"); }
     finally { setBusy(false); }
+  }
+  async function copyCredential(which: "key" | "password" | "both") {
+    if (!issued) return;
+    const copied = which === "key" ? issued.employee.key :
+      which === "password" ? issued.password :
+      `คีย์พนักงาน: ${issued.employee.key}\nรหัสผ่าน: ${issued.password}\nหน้าเข้าสู่ระบบ: ${location.origin}/staff/login`;
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("CLIPBOARD_UNAVAILABLE");
+      await navigator.clipboard.writeText(copied);
+      setCopyMessage(which === "key" ? "คัดลอกคีย์แล้ว" :
+        which === "password" ? "คัดลอกรหัสผ่านแล้ว" : "คัดลอกคีย์และรหัสผ่านแล้ว");
+    } catch {
+      // iOS private mode and permissions may block the clipboard API.
+      // Do not log or store the password; the inputs remain selectable.
+      setCopyMessage("คัดลอกอัตโนมัติไม่ได้ กรุณาเลือกข้อความในช่องแล้วคัดลอกด้วยตนเอง");
+    }
+  }
+  function acknowledgeCredentials() {
+    if (!credentialsSaved) return;
+    setIssued(undefined);
+    setPasswordVisible(false);
+    setCredentialsSaved(false);
+    setCopyMessage("");
   }
   async function revoke() {
     if (!revokeKey || busy) return;
@@ -94,15 +123,38 @@ function EmployeeManager() {
               <h3>ออกบัญชีสำเร็จ — แสดงรหัสผ่านครั้งเดียว</h3>
               <p>{issued.employee.firstName} {issued.employee.lastName} ({issued.employee.nickname})</p>
               <label className="field"><span>คีย์พนักงาน</span>
-                <input aria-label="คีย์พนักงานที่สร้าง" readOnly value={issued.employee.key} />
+                <input aria-label="คีย์พนักงานที่สร้าง" readOnly value={issued.employee.key}
+                  onFocus={(event) => event.currentTarget.select()} />
               </label>
+              <button className="button secondary small employee-copy-action" type="button"
+                onClick={() => void copyCredential("key")}>คัดลอกคีย์</button>
               <label className="field"><span>รหัสผ่านเริ่มต้น</span>
-                <input aria-label="รหัสผ่านพนักงานที่สร้าง" readOnly value={issued.password} />
+                <input aria-label="รหัสผ่านพนักงานที่สร้าง" readOnly
+                  type={passwordVisible ? "text" : "password"} value={issued.password}
+                  onFocus={(event) => event.currentTarget.select()} />
               </label>
-              <p className="small-note">จดหรือส่งผ่านช่องทางส่วนตัวให้พนักงาน รหัสผ่านจะไม่แสดงให้แอดมินดูย้อนหลัง</p>
+              <div className="employee-secret-actions">
+                <button className="button secondary small" type="button"
+                  aria-pressed={passwordVisible} onClick={() => setPasswordVisible((value) => !value)}>
+                  {passwordVisible ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                </button>
+                <button className="button secondary small" type="button"
+                  onClick={() => void copyCredential("password")}>คัดลอกรหัสผ่าน</button>
+                <button className="button secondary small" type="button"
+                  onClick={() => void copyCredential("both")}>คัดลอกทั้งชุด</button>
+              </div>
+              {copyMessage && <p className="small-note" role="status">{copyMessage}</p>}
+              <p className="small-note">แสดงรหัสผ่านครั้งเดียวเท่านั้น เก็บไว้ในที่ปลอดภัยและส่งให้พนักงานผ่านช่องทางส่วนตัว ห้ามส่งในกลุ่มแชท รหัสผ่านที่คัดลอกจะยังอยู่ในคลิปบอร์ดของอุปกรณ์จนกว่าจะถูกแทนที่</p>
               <a href="/staff/login">ลิงก์หน้าเข้าสู่ระบบพนักงาน</a>
+              <label className="employee-credential-confirm">
+                <input type="checkbox" checked={credentialsSaved}
+                  onChange={(event) => setCredentialsSaved(event.target.checked)} />
+                <span>ฉันบันทึกคีย์และรหัสผ่านเรียบร้อยแล้ว</span>
+              </label>
               <button className="button secondary full" type="button"
-                onClick={() => setIssued(undefined)}>รับทราบและสร้างบัญชีถัดไป</button>
+                disabled={!credentialsSaved} onClick={acknowledgeCredentials}>
+                รับทราบและสร้างบัญชีถัดไป
+              </button>
             </div>
           ) : (
             <form className="employee-form" onSubmit={(e) => void create(e)}>

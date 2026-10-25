@@ -285,6 +285,13 @@ async function layout(page: Page, info: TestInfo, name: string) {
   });
 }
 test("founder reissues a disabled employee key with a new password and no old account reuse", async ({ page }, info) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: {
+      writeText: async (value: string) => {
+        (window as Window & { __qaCopied?: string }).__qaCopied = value;
+      },
+    } });
+  });
   const state = await setup(page, true);
   state.employees.push({
     key: "00001", userId: "retired-sub", role: "EMPLOYEE",
@@ -302,15 +309,60 @@ test("founder reissues a disabled employee key with a new password and no old ac
   await expect(page.getByLabel("คีย์พนักงานที่สร้าง")).toHaveValue("00001");
   await expect(page.getByLabel("รหัสผ่านพนักงานที่สร้าง"))
     .toHaveValue("AZb-9-00001-strong-unique-secret");
+  await expect(page.getByLabel("รหัสผ่านพนักงานที่สร้าง")).toHaveAttribute("type", "password");
+  const done = page.getByRole("button", { name: "รับทราบและสร้างบัญชีถัดไป" });
+  await expect(done).toBeDisabled();
+  await page.getByRole("button", { name: "แสดงรหัสผ่าน" }).click();
+  await expect(page.getByLabel("รหัสผ่านพนักงานที่สร้าง")).toHaveAttribute("type", "text");
+  await page.getByRole("button", { name: "ซ่อนรหัสผ่าน" }).click();
+  await expect(page.getByLabel("รหัสผ่านพนักงานที่สร้าง")).toHaveAttribute("type", "password");
+  await page.getByRole("button", { name: "คัดลอกคีย์" }).click();
+  expect(await page.evaluate(() => (window as Window & { __qaCopied?: string }).__qaCopied)).toBe("00001");
+  await page.getByRole("button", { name: "คัดลอกรหัสผ่าน" }).click();
+  expect(await page.evaluate(() => (window as Window & { __qaCopied?: string }).__qaCopied))
+    .toBe("AZb-9-00001-strong-unique-secret");
+  await page.getByRole("button", { name: "คัดลอกทั้งชุด" }).click();
+  const bundle = await page.evaluate(() => (window as Window & { __qaCopied?: string }).__qaCopied);
+  expect(bundle).toContain("คีย์พนักงาน: 00001");
+  expect(bundle).toContain("รหัสผ่าน: AZb-9-00001-strong-unique-secret");
+  expect(bundle).toContain("/staff/login");
+  expect(JSON.stringify(await page.evaluate(() => ({ ...localStorage, ...sessionStorage }))))
+    .not.toContain("AZb-9-00001-strong-unique-secret");
   expect(state.employees).toHaveLength(1);
   expect(state.employees[0]).toMatchObject({
     key: "00001", userId: "replacement-sub", firstName: "สมหญิง", active: true,
   });
-  await page.getByRole("button", { name: "รับทราบและสร้างบัญชีถัดไป" }).click();
+  await page.getByLabel("ฉันบันทึกคีย์และรหัสผ่านเรียบร้อยแล้ว").check();
+  await expect(done).toBeEnabled();
+  await done.click();
+  await expect(page.getByLabel("รหัสผ่านพนักงานที่สร้าง")).toHaveCount(0);
   await expect(page.getByText("ใหม่ — สมหญิง ทดลอง")).toBeVisible();
   await expect(page.getByRole("button", { name: "นำคีย์ 00001 กลับมาใช้" })).toHaveCount(0);
   expect((await new AxeBuilder({page}).withTags(["wcag2a","wcag2aa","wcag21aa"]).analyze()).violations).toEqual([]);
   await layout(page, info, "employee-reissued-key");
+});
+
+test("new employee secret is acknowledged explicitly and clipboard failure is recoverable", async ({ page }) => {
+  const state = await setup(page, true);
+  await page.goto("/admin/employees");
+  await page.getByLabel("ชื่อจริง").fill("ทดสอบ");
+  await page.getByLabel("นามสกุล").fill("ระบบ");
+  await page.getByLabel("ชื่อเล่น").fill("พนักงาน");
+  await page.getByRole("button", { name: "สร้างคีย์และรหัสผ่าน" }).click();
+  expect(state.employees).toHaveLength(1);
+  await expect(page.getByLabel("คีย์พนักงานที่สร้าง")).toHaveValue("00002");
+  await expect(page.getByRole("button", { name: "รับทราบและสร้างบัญชีถัดไป" })).toBeDisabled();
+  await page.evaluate(() => Object.defineProperty(navigator, "clipboard", {
+    configurable: true, value: { writeText: async () => { throw new Error("blocked"); } },
+  }));
+  await page.getByRole("button", { name: "คัดลอกรหัสผ่าน" }).click();
+  await expect(page.getByRole("status")).toContainText("คัดลอกอัตโนมัติไม่ได้");
+  await expect(page.getByLabel("รหัสผ่านพนักงานที่สร้าง"))
+    .toHaveValue("AZb-8-00002-random-unique-secret");
+  await expect(page.getByRole("button", { name: "รับทราบและสร้างบัญชีถัดไป" })).toBeDisabled();
+  await page.getByLabel("ฉันบันทึกคีย์และรหัสผ่านเรียบร้อยแล้ว").check();
+  await page.getByRole("button", { name: "รับทราบและสร้างบัญชีถัดไป" }).click();
+  await expect(page.getByLabel("รหัสผ่านพนักงานที่สร้าง")).toHaveCount(0);
 });
 
 test("founder inbox replies, retries without duplicates and reloads saved messages", async ({

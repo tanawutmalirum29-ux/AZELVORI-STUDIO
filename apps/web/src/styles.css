@@ -5250,6 +5250,20 @@ dd {
 .employee-issued { display: flex; flex-direction: column; gap: 14px; margin-top: 20px; }
 .employee-issued h3 { font-size: 17px; }
 .employee-issued input { font-family: monospace; color: #b8f4e5; overflow-wrap: anywhere; }
+.employee-secret-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.employee-secret-actions .button { flex: 1 1 auto; white-space: normal; }
+.employee-copy-action { align-self: flex-start; }
+.employee-credential-confirm {
+  display: flex; align-items: flex-start; gap: 10px;
+  font-size: 13px; line-height: 1.6; color: var(--text); cursor: pointer;
+}
+.employee-credential-confirm input[type="checkbox"] {
+  width: 18px; height: 18px; min-height: 18px; flex: 0 0 18px;
+  margin: 2px 0 0; accent-color: #a8e8df;
+}
+.employee-credential-confirm:focus-within {
+  border-radius: 5px; outline: 2px solid #86d6c6; outline-offset: 3px;
+}
 .employee-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
 .employee-list { display: flex; flex-direction: column; gap: 11px; margin-top: 16px; }
 .employee-record { display: flex; align-items: center; justify-content: space-between; gap: 12px;
