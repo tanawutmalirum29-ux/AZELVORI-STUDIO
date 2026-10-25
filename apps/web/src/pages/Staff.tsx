@@ -26,6 +26,19 @@ export function StaffLogin() {
   const [busy, setBusy] = useState(false);
   const [rememberDevice, setRememberDevice] = useState(true);
   const [error, setError] = useState("");
+  useEffect(() => {
+    if (!employeeSessionExists()) return;
+    let mounted = true;
+    void staffApi<Employee>("/me").then(() => {
+      if (mounted) location.replace("/staff/inbox");
+    }).catch((error: unknown) => {
+      if (!mounted) return;
+      if ((error as ApiError)?.status === 401 || (error as ApiError)?.status === 403 ||
+          !employeeSessionExists()) clearEmployeeSession();
+      // Offline access remains saved; avoid deleting trusted-device credentials.
+    });
+    return () => { mounted = false; };
+  }, []);
   async function enter(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (busy) return;
