@@ -71,6 +71,9 @@ test("employee signs in with issued key, chats, acknowledges work and signs out"
   await page.getByLabel("รหัสผ่าน").fill("demo-employee-strong-password");
   await page.getByRole("button",{name:"เข้าสู่พื้นที่พนักงาน"}).click();
   await expect(page).toHaveURL(/\/staff\/inbox$/);
+  const savedRefresh = await page.evaluate(() => localStorage.getItem("azelvori:employee-session"));
+  expect(savedRefresh).toContain("synthetic-refresh");
+  expect(savedRefresh).not.toContain("synthetic-employee-access");
   await expect(page.getByText("ลูกค้าขออัปเดตงาน")).toBeVisible();
   await page.getByRole("textbox",{name:"ตอบกลับลูกค้า"}).fill("พนักงานรับเรื่องแล้ว");
   await page.getByRole("button",{name:"ส่งข้อความ"}).click();
@@ -85,6 +88,7 @@ test("employee signs in with issued key, chats, acknowledges work and signs out"
   await expect(page).toHaveURL(/\/staff\/login$/);
   const saved=await page.evaluate(()=>JSON.stringify({...sessionStorage}));
   expect(saved).not.toContain("synthetic-employee-access");
+  expect(await page.evaluate(() => localStorage.getItem("azelvori:employee-session"))).toBeNull();
 });
 test("employee login is separate from the founder administration",async({page})=>{
   await page.goto("/staff/login");
