@@ -27,7 +27,8 @@ export function auth() {
       silentRequestTimeoutInSeconds: 15,
       requestTimeoutInSeconds: 15,
       loadUserInfo: false,
-      userStore: new WebStorageStateStore({ store: sessionStorage }),
+      // OAuth fallback also survives tab closures; PKCE request state stays per-tab.
+      userStore: new WebStorageStateStore({ store: localStorage }),
       stateStore: new WebStorageStateStore({ store: sessionStorage }),
       metadata: {
         issuer: authority,
@@ -151,9 +152,12 @@ export async function accessToken(): Promise<string> {
           throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
         return renewed.access_token;
       })
-      .catch(async () => {
-        await auth().removeUser();
-        throw new Error("ต่ออายุเซสชันไม่สำเร็จ กรุณาเข้าสู่ระบบใหม่");
+      .catch(async (error: unknown) => {
+        if (error instanceof Error && ["invalid_grant", "NotAuthorizedException"].includes(error.name)) {
+          await auth().removeUser();
+          throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
+        }
+        throw new Error("เชื่อมต่อไม่ได้ชั่วคราว กรุณาลองอีกครั้ง");
       })
       .finally(() => {
         refreshing = undefined;
