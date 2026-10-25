@@ -36,6 +36,8 @@ export function validateOptions(o: FoundationOptions) {
     throw new Error("stage must be dev, staging or prod");
   if (!["reserved", "shared"].includes(o.lambdaConcurrency ?? "reserved"))
     throw new Error("lambdaConcurrency must be reserved or shared");
+  if (o.pilotEnabled && (o.stage !== "staging" || o.intakeEnabled))
+    throw new Error("Founder-only pilot requires staging with public intake disabled");
   if (
     o.lambdaConcurrency === "shared" &&
     (o.stage !== "staging" || o.intakeEnabled)
@@ -56,8 +58,6 @@ export function validateOptions(o: FoundationOptions) {
     throw new Error(
       "appOrigin must be an HTTPS origin without a trailing slash (localhost HTTP allowed only in dev)",
     );
-  if (o.pilotEnabled && (o.stage !== "staging" || o.intakeEnabled))
-    throw new Error("Founder-only pilot requires staging with public intake disabled");
   if (o.intakeEnabled && !o.legalReady)
     throw new Error(
       "Intake requires legalReady after publishing reviewed identity and privacy notices",
