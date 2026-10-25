@@ -7,21 +7,28 @@ type StaffConfig = { poolId: string; clientId: string; region: string };
 type TokenSet = { access: string; refresh: string; expiresAt: number };
 const SESSION_KEY = "azelvori:employee-session";
 /** Persistent only when the employee explicitly trusts this device. */
-function getSessionStore(): Storage {
-  try { if (localStorage.getItem(SESSION_KEY)) return localStorage; } catch { /* Private mode */ }
-  return sessionStorage;
+type StaffTabSession = TokenSet & { remembered?: boolean };
+/** The durable store contains only the opaque refresh credential. Access tokens
+ * remain tab-scoped; on the next browser launch they are refreshed on demand. */
+function persistentRefresh(): string | undefined {
+  try {
+    const value = localStorage.getItem(SESSION_KEY);
+    if (!value) return;
+    const data = JSON.parse(value) as { refresh?: unknown };
+    return typeof data.refresh === "string" && data.refresh ? data.refresh : undefined;
+  } catch { return; }
 }
-function saveSession(data: TokenSet, remember = getSessionStore() === localStorage) {
-  const stored = JSON.stringify(data);
+function saveSession(data: TokenSet, remember = !!persistentRefresh()) {
+  let persisted = false;
   if (remember) {
     try {
-      localStorage.setItem(SESSION_KEY, stored);
-      sessionStorage.removeItem(SESSION_KEY);
-      return;
-    } catch { /* Disabled storage: use tab-only session. */ }
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ refresh: data.refresh }));
+      persisted = true;
+    } catch { /* In private mode, keep a tab-only session. */ }
+  } else {
+    try { localStorage.removeItem(SESSION_KEY); } catch { /* Restricted storage */ }
   }
-  sessionStorage.setItem(SESSION_KEY, stored);
-  try { localStorage.removeItem(SESSION_KEY); } catch { /* Storage can be restricted. */ }
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify({ ...data, remembered: persisted }));
 }
 function invalidRefresh(error: unknown) {
   return error instanceof Error && [
@@ -49,13 +56,20 @@ async function client() {
   };
 }
 function read(): TokenSet | undefined {
+  const refresh = persistentRefresh();
   try {
-    const raw = getSessionStore().getItem(SESSION_KEY);
-    if (!raw) return;
-    const s: TokenSet = JSON.parse(raw);
-    if (typeof s.access === "string" && typeof s.refresh === "string" &&
-        typeof s.expiresAt === "number") return s;
-  } catch { /* Invalid storage is not authenticated. */ }
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (raw) {
+      const data = JSON.parse(raw) as StaffTabSession;
+      if (typeof data.access === "string" && typeof data.refresh === "string" &&
+          typeof data.expiresAt === "number") {
+        // A sign-out in a different tab invalidates this remembered device.
+        if (data.remembered && (!refresh || refresh !== data.refresh)) return;
+        return data;
+      }
+    }
+    if (refresh) return { access: "", refresh, expiresAt: 0 };
+  } catch { /* Invalid storage must not grant access. */ }
 }
 export const employeeSessionExists = () => !!read();
 export function clearEmployeeSession() {
