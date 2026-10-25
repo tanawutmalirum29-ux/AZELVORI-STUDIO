@@ -24,6 +24,8 @@ export type FoundationOptions = {
   stage: "dev" | "staging" | "prod";
   appOrigin: string;
   intakeEnabled: boolean;
+  /** Founder-only, synthetic-data live backend testing, never public intake. */
+  pilotEnabled?: boolean;
   legalReady: boolean;
   budgetEmail?: string;
   budgetUsd?: number;
@@ -54,6 +56,8 @@ export function validateOptions(o: FoundationOptions) {
     throw new Error(
       "appOrigin must be an HTTPS origin without a trailing slash (localhost HTTP allowed only in dev)",
     );
+  if (o.pilotEnabled && (o.stage !== "staging" || o.intakeEnabled))
+    throw new Error("Founder-only pilot requires staging with public intake disabled");
   if (o.intakeEnabled && !o.legalReady)
     throw new Error(
       "Intake requires legalReady after publishing reviewed identity and privacy notices",
@@ -196,6 +200,7 @@ export class FoundationStack extends Stack {
         AUDIT_TABLE: audit.tableName,
         APP_ORIGIN: options.appOrigin,
         INTAKE_ENABLED: String(options.intakeEnabled),
+        PILOT_ENABLED: String(options.pilotEnabled === true),
         USER_POOL_ID: pool.userPoolId,
         EMPLOYEE_POOL_ID: employeePool.userPoolId,
         EMPLOYEE_CLIENT_ID: employeeClient.userPoolClientId,
@@ -309,6 +314,13 @@ export class FoundationStack extends Stack {
       path: "/api/v1/leads",
       methods: [apigateway.HttpMethod.POST],
       integration,
+    });
+    api.addRoutes({
+      path: "/api/v1/admin/pilot/leads",
+      methods: [apigateway.HttpMethod.POST],
+      integration,
+      authorizer: jwt,
+      authorizationScopes: ["azelvori/access", "aws.cognito.signin.user.admin"],
     });
     api.addRoutes({
       path: "/api/v1/admin/leads",
@@ -425,6 +437,9 @@ export class FoundationStack extends Stack {
     new CfnOutput(this, "IntakeEnabled", {
       value: String(options.intakeEnabled),
     });
+    new CfnOutput(this, "PilotEnabled", {
+      value: String(options.pilotEnabled === true),
+    });
     new CfnOutput(this, "LambdaConcurrencyMode", { value: concurrencyMode });
   }
 }
@@ -436,6 +451,7 @@ if (process.argv[1]?.endsWith("/app.ts")) {
     stage,
     appOrigin: app.node.tryGetContext("appOrigin") ?? "http://localhost:4173",
     intakeEnabled: app.node.tryGetContext("intakeEnabled") === "true",
+    pilotEnabled: app.node.tryGetContext("pilotEnabled") === "true",
     legalReady: app.node.tryGetContext("legalReady") === "true",
     lambdaConcurrency:
       app.node.tryGetContext("lambdaConcurrency") ?? "reserved",
