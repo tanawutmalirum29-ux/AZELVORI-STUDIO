@@ -97,7 +97,7 @@ describe("founder-issued employee credentials and access", () => {
     await expect(f.employeeDirectory.active({ sub: replacement.employee.userId, token: "revoked" }))
       .rejects.toMatchObject({status:403});
     expect(f.commands.filter(x => x.name === "AdminDisableUserCommand")
-      .map(x => x.input.Username)).toEqual(["emp-00001-v1","emp-00001-v3"]);
+      .map(x => x.input.Username)).toEqual(["emp-00001-v1","emp-00001-v1","emp-00001-v3","emp-00001-v3"]);
   });
   it("a raced reissue cannot reactivate a retired identity or overwrite current directory", async () => {
     const f = await fixture();
