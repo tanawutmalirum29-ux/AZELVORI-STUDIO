@@ -18,6 +18,7 @@ if (!staffPool || !staffClient) throw new Error("Missing employee configuration"
 const workspaceStore = new DynamoWorkspaceStore(table, audit);
 export const handler = createHandler(repository, {
   intakeEnabled: process.env.INTAKE_ENABLED === "true",
+  pilotEnabled: process.env.PILOT_ENABLED === "true",
   allowedOrigin: origin,
   employees: new EmployeeService(workspaceStore, repository, table, staffPool, audit),
   employeeConfig: { poolId: staffPool, clientId: staffClient, region: process.env.AWS_REGION ?? "ap-southeast-2" },
