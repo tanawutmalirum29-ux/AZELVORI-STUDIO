@@ -53,7 +53,7 @@ export function validateOptions(o: FoundationOptions) {
     (o.stage !== "staging" || (o.intakeEnabled && !o.publicBetaMode))
   )
     throw new Error(
-      "Shared Lambda concurrency is permitted only for private staging or explicitly reviewed public beta; use reserved for full production intake",
+      "Shared Lambda concurrency is only supported for staging with public intake disabled or explicitly reviewed staging public beta; use reserved for production intake",
     );
   const url = new URL(o.appOrigin);
   if (
