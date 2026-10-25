@@ -55,6 +55,7 @@ export function createHandler(repo: Repository, config: ApiConfig) {
           schemaVersion: 2,
           capabilities: ["crm-follow-up", "private-workspace"],
           intakeEnabled: config.intakeEnabled,
+          pilotEnabled: config.pilotEnabled === true,
         });
       if (path === "/api/v1/employee/config" && method === "GET" && config.employeeConfig)
         return respond(200, config.employeeConfig);
