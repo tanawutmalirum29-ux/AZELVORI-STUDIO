@@ -265,6 +265,7 @@ function Desk({
         <a href="/admin" aria-current="page">
           บรีฟและคิวงาน
         </a>
+        <a href="/admin/pilot">ทดสอบงานจริง</a>
         <a href="/admin/inbox">ข้อความลูกค้า</a>
         <a href="/admin/projects">จัดการโปรเจกต์</a>
         <a href="/admin/employees">บัญชีพนักงาน</a>
