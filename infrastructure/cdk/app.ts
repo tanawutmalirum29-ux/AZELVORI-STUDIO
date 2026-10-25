@@ -26,6 +26,10 @@ export type FoundationOptions = {
   intakeEnabled: boolean;
   /** Founder-only, synthetic-data live backend testing, never public intake. */
   pilotEnabled?: boolean;
+  /** Live public beta on the existing shared-capacity staging account. */
+  publicBetaMode?: boolean;
+  /** Operational, owner-verified privacy contact published in the website. */
+  privacyContactEmail?: string;
   legalReady: boolean;
   budgetEmail?: string;
   budgetUsd?: number;
@@ -38,12 +42,18 @@ export function validateOptions(o: FoundationOptions) {
     throw new Error("lambdaConcurrency must be reserved or shared");
   if (o.pilotEnabled && (o.stage !== "staging" || o.intakeEnabled))
     throw new Error("Founder-only pilot requires staging with public intake disabled");
+  if (o.publicBetaMode && (
+    o.stage !== "staging" || !o.intakeEnabled ||
+    o.pilotEnabled || !o.legalReady ||
+    !o.privacyContactEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(o.privacyContactEmail)
+  ))
+    throw new Error("Public beta requires staging, real intake, reviewed legal notice and a real privacy contact; founder pilot must be disabled");
   if (
     o.lambdaConcurrency === "shared" &&
-    (o.stage !== "staging" || o.intakeEnabled)
+    (o.stage !== "staging" || (o.intakeEnabled && !o.publicBetaMode))
   )
     throw new Error(
-      "Shared Lambda concurrency is only supported for staging with public intake disabled; use reserved before opening intake",
+      "Shared Lambda concurrency is permitted only for private staging or explicitly reviewed public beta; use reserved for full production intake",
     );
   const url = new URL(o.appOrigin);
   if (
@@ -388,8 +398,8 @@ export class FoundationStack extends Stack {
     stage.defaultRouteSettings = {
       // Shared capacity is for private staging tests. API Gateway targets are
       // best-effort per route, not a hard concurrency or spending ceiling.
-      throttlingBurstLimit: concurrencyMode === "shared" ? 5 : 20,
-      throttlingRateLimit: concurrencyMode === "shared" ? 2 : 10,
+      throttlingBurstLimit: options.publicBetaMode ? 2 : concurrencyMode === "shared" ? 5 : 20,
+      throttlingRateLimit: options.publicBetaMode ? 1 : concurrencyMode === "shared" ? 2 : 10,
     };
     stage.accessLogSettings = {
       destinationArn: accessLogs.logGroupArn,
@@ -437,6 +447,7 @@ export class FoundationStack extends Stack {
     new CfnOutput(this, "IntakeEnabled", {
       value: String(options.intakeEnabled),
     });
+    new CfnOutput(this, "PublicBetaMode", { value: String(options.publicBetaMode === true) });
     new CfnOutput(this, "PilotEnabled", {
       value: String(options.pilotEnabled === true),
     });
@@ -452,6 +463,8 @@ if (process.argv[1]?.endsWith("/app.ts")) {
     appOrigin: app.node.tryGetContext("appOrigin") ?? "http://localhost:4173",
     intakeEnabled: app.node.tryGetContext("intakeEnabled") === "true",
     pilotEnabled: app.node.tryGetContext("pilotEnabled") === "true",
+    publicBetaMode: app.node.tryGetContext("publicBetaMode") === "true",
+    privacyContactEmail: app.node.tryGetContext("privacyContactEmail") || undefined,
     legalReady: app.node.tryGetContext("legalReady") === "true",
     lambdaConcurrency:
       app.node.tryGetContext("lambdaConcurrency") ?? "reserved",
