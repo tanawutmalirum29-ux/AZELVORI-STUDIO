@@ -16,13 +16,14 @@ async function authorized<T>(path: string, method = "GET", body?: unknown): Prom
   return api<T>(path, {
     method, headers: { Authorization: "Bearer " + token },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  }, method === "POST" && path === "/api/v1/admin/employees" ? 201 : 200);
+  }, method === "POST" && (path === "/api/v1/admin/employees" || path.endsWith("/reissue")) ? 201 : 200);
 }
 function EmployeeManager() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [cursor, setCursor] = useState<string>();
   const [form, setForm] = useState({ firstName: "", lastName: "", nickname: "" });
   const [issued, setIssued] = useState<Issued>();
+  const [reuseKey, setReuseKey] = useState<string>();
   const [revokeKey, setRevokeKey] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -43,9 +44,14 @@ function EmployeeManager() {
     if (busy || issued) return;
     setBusy(true); setError(""); setNotice("");
     try {
-      const result = await authorized<Issued>("/api/v1/admin/employees", "POST", form);
+      const result = await authorized<Issued>(reuseKey
+        ? "/api/v1/admin/employees/" + encodeURIComponent(reuseKey) + "/reissue"
+        : "/api/v1/admin/employees", "POST", form);
       setIssued(result);
-      setEmployees((list) => [result.employee, ...list]);
+      setEmployees((list) => reuseKey
+        ? list.map((row) => row.key === reuseKey ? result.employee : row)
+        : [result.employee, ...list]);
+      setReuseKey(undefined);
       setForm({ firstName: "", lastName: "", nickname: "" });
     } catch (e) { setError(e instanceof Error ? e.message : "สร้างพนักงานไม่สำเร็จ"); }
     finally { setBusy(false); }
@@ -58,7 +64,7 @@ function EmployeeManager() {
         "/api/v1/admin/employees/" + encodeURIComponent(revokeKey) + "/revoke", "POST", {},
       );
       setEmployees((rows) => rows.map((row) => row.key === revokeKey ? result.employee : row));
-      setNotice("ปิดบัญชี " + revokeKey + " แล้ว ไม่สามารถนำรหัสนี้กลับมาใช้ซ้ำ");
+      setNotice("ปิดบัญชี " + revokeKey + " แล้ว รหัสผ่านเก่าใช้ไม่ได้อีก แต่คีย์นี้สามารถออกใหม่ได้");
       setRevokeKey(undefined);
     } catch (e) { setError(e instanceof Error ? e.message : "ปิดคีย์ไม่สำเร็จ"); }
     finally { setBusy(false); }
@@ -77,8 +83,12 @@ function EmployeeManager() {
       {notice && <Notice kind="success">{notice}</Notice>}
       <div className="employee-grid">
         <section className="employee-panel">
-          <h2>สร้างบัญชีพนักงาน</h2>
-          <p className="small-note">คีย์รันเลขลำดับเริ่ม 00001 เพิ่มหลักเมื่อครบ 99999 และไม่วนกลับมาใช้ซ้ำ</p>
+          <h2>{reuseKey ? "ออกบัญชีใหม่ด้วยคีย์ " + reuseKey : "สร้างบัญชีพนักงาน"}</h2>
+          <p className="small-note">คีย์ใหม่รันเลขเริ่ม 00001 และเพิ่มหลักเมื่อครบ 99999 คีย์ที่ปิดแล้วสามารถใช้ซ้ำได้ โดยรหัสผ่านและบัญชีเดิมจะไม่กลับมาใช้ได้อีก</p>
+          {reuseKey && <button type="button" className="button secondary small" disabled={busy}
+            onClick={() => { setReuseKey(undefined); setForm({ firstName: "", lastName: "", nickname: "" }); }}>
+            ยกเลิกการใช้คีย์เดิม
+          </button>}
           {issued ? (
             <div className="employee-issued">
               <h3>ออกบัญชีสำเร็จ — แสดงรหัสผ่านครั้งเดียว</h3>
@@ -109,7 +119,7 @@ function EmployeeManager() {
                   onChange={(e) => setForm({ ...form, nickname: e.target.value })} />
               </label>
               <button className="button full" disabled={busy || !form.firstName.trim() ||
-                !form.lastName.trim() || !form.nickname.trim()}>สร้างคีย์และรหัสผ่าน</button>
+                !form.lastName.trim() || !form.nickname.trim()}>{reuseKey ? "ออกคีย์เดิมพร้อมรหัสผ่านใหม่" : "สร้างคีย์และรหัสผ่าน"}</button>
             </form>
           )}
         </section>
@@ -125,8 +135,11 @@ function EmployeeManager() {
                   <p>คีย์ {e.key} · {e.active ? "เปิดใช้งาน" : "ปิดแล้ว"}</p>
                   <small>สร้าง {new Date(e.createdAt).toLocaleDateString("th-TH")}</small>
                 </div>
-                {e.active && <button className="button secondary small" type="button"
-                  disabled={busy} onClick={() => setRevokeKey(e.key)}>ปิดคีย์</button>}
+                {e.active ? <button className="button secondary small" type="button"
+                  disabled={busy} onClick={() => setRevokeKey(e.key)}>ปิดคีย์</button>
+                  : <button className="button secondary small" type="button" disabled={busy || !!issued}
+                    onClick={() => { setReuseKey(e.key); setForm({ firstName: "", lastName: "", nickname: "" });
+                      setError(""); setNotice(""); }}>นำคีย์ {e.key} กลับมาใช้</button>}
               </article>
             ))}
           </div>
@@ -137,7 +150,7 @@ function EmployeeManager() {
       {revokeKey && (
         <section className="employee-revoke-dialog" role="dialog" aria-modal="true" aria-label="ยืนยันปิดคีย์">
           <h2>ยืนยันปิดคีย์ {revokeKey}?</h2>
-          <p>พนักงานจะหมดสิทธิ์ตอบแชททันที คีย์นี้ไม่สามารถเปิดกลับหรือออกซ้ำได้</p>
+          <p>บัญชีและรหัสผ่านเดิมจะใช้ไม่ได้อีก แต่คีย์เลขนี้สามารถออกให้พนักงานใหม่พร้อมรหัสผ่านใหม่ได้</p>
           <div className="row-actions">
             <button className="button secondary" disabled={busy} onClick={() => setRevokeKey(undefined)}>ยกเลิก</button>
             <button className="button" disabled={busy} onClick={() => void revoke()}>ยืนยันปิดคีย์</button>
