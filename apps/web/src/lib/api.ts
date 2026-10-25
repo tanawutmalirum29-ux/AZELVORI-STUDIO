@@ -16,8 +16,10 @@ export const apiBase = (import.meta.env.VITE_API_BASE_URL ?? "").replace(
   /\/$/,
   "",
 );
+export const privacyContactEmail = (import.meta.env.VITE_PRIVACY_CONTACT_EMAIL ?? "").trim();
 export const intakeEnabled =
   import.meta.env.VITE_PUBLIC_INTAKE_ENABLED === "true" &&
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(privacyContactEmail) &&
   /^https:\/\//.test(apiBase);
 export class ApiError extends Error {
   constructor(

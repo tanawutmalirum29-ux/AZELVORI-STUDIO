@@ -20,6 +20,12 @@
 - **What it does NOT enable:** public intake, payment processing, file attachments, customer self-signup, legal release approval, realtime notifications; they remain explicitly unavailable.
 - **Rollout:** Existing `Azelvori-staging`, `pilotEnabled=true` with `intakeEnabled=false`, `legalReady=false`, `lambdaConcurrency=shared`; operator must review CDK diff and complete CloudShell deploy. Verify Amplify build from same main SHA. No live results claimed without actual operator test.
 
+### PUBLIC-01 — Open real public customer briefs (staging public beta)
+- **Status: IN REVIEW / NOT DEPLOYED** — [Guide](../../docs/24_PUBLIC_CUSTOMER_BETA.md), [owner-operated deployment script](../../scripts/open-public-beta.sh). Branch PR and QA evidence required.
+- **Code scope:** anonymous validated `/start` form sends real project briefs when website and backend flags are both enabled; mandatory genuine public privacy contact; updated privacy/terms/consent; backend public-beta guard with a low throttling rate even under AWS shared-concurrency staging.
+- **Acceptance still required:** PR CI, main CI, AWS CDK diff review, operator legal disclosure check/valid contact email, backend staging deployment, Amplify main build, anonymous-to-founder end-to-end real database smoke.
+- **Not included:** real card/payment processing, public self-registration, uploads or fully reviewed production legal procedures. These remain open Work items.
+
 ## Critical/high work explicitly NOT done (for Work)
 
 | ID | Finding from audit | Status | Production impact / required verification |

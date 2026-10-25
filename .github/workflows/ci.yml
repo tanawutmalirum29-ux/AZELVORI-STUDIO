@@ -20,6 +20,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts
+      - run: bash -n scripts/open-public-beta.sh
       - run: npm run build
       - run: node scripts/verify-hosting.mjs
       - run: npm test
@@ -28,6 +29,7 @@ jobs:
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run test:e2e
       - run: npm run test:e2e:workspace
+      - run: npm run test:e2e:public
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
@@ -37,6 +39,8 @@ jobs:
             test-results/
             workspace-report/
             workspace-test-results/
+            public-report/
+            public-test-results/
             apps/web/dist/
             cdk.out/*.template.json
           retention-days: 14

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   LeadSchema,
+  LeadRecordSchema,
+  PRIVACY_VERSION,
   LeadDetailsSchema,
   LeadTimingSchema,
   LeadReferencesSchema,
@@ -107,6 +109,21 @@ describe("brief contracts", () => {
     expect(LeadSchema.safeParse({ ...validLead, ...patch }).success).toBe(
       false,
     );
+  });
+  it("requires updated public consent without hiding historic alpha leads", () => {
+    expect(PRIVACY_VERSION).toBe("public-beta-2026-10-25");
+    expect(LeadSchema.safeParse({
+      ...validLead, privacyVersion: "alpha-2026-10-23",
+    }).success).toBe(false);
+    const record = {
+      ...validLead,
+      privacyVersion: "alpha-2026-10-23",
+      leadId: "LEAD-2026-0123456789ABCDEF",
+      createdAt: "2026-10-23T09:00:00.000Z",
+      status: "NEW",
+      version: 1,
+    };
+    expect(LeadRecordSchema.safeParse(record).success).toBe(true);
   });
   it("normalizes email", () => {
     expect(

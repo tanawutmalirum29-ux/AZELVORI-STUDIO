@@ -29,7 +29,7 @@ export const BUDGET_LABELS: Record<(typeof BUDGETS)[number], string> = {
   "60000_PLUS": "60,000 บาทขึ้นไป",
   DISCUSS: "ขอคำแนะนำเรื่องงบ",
 };
-export const PRIVACY_VERSION = "alpha-2026-10-23";
+export const PRIVACY_VERSION = "public-beta-2026-10-25";
 const shortText = z.string().trim().max(200);
 const optionalText = z.string().trim().max(3000).default("");
 const LeadFields = z
@@ -185,6 +185,12 @@ export const LeadFollowUpSchema = z
   .strict();
 export type LeadFollowUp = z.infer<typeof LeadFollowUpSchema>;
 export const LeadRecordSchema = LeadFields.extend({
+  // Historic alpha leads remain readable after changing the consent text.
+  // New submissions must use the current PRIVACY_VERSION via LeadSchema.
+  privacyVersion: z.union([
+    z.literal(PRIVACY_VERSION),
+    z.literal("alpha-2026-10-23"),
+  ]),
   leadId: z.string().regex(/^LEAD-\d{4}-[A-F0-9]{16}$/),
   createdAt: z.iso.datetime(),
   status: z.enum(LEAD_STATUSES),
