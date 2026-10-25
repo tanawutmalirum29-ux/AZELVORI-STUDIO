@@ -45,6 +45,11 @@ if [[ "$LEGAL" != "LEGAL" ]]; then
   echo "Privacy notice not approved. No AWS changes." >&2; exit 1
 fi
 
+echo "Checking clean main against remote before public launch…"
+git fetch origin main
+if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
+  echo "main changed. Run git pull --ff-only origin main and check CI before launch." >&2; exit 1
+fi
 echo "Building code and calculating AWS diff…"
 npm ci --ignore-scripts
 npm run build:api
