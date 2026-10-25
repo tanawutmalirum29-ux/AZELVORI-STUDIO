@@ -43,8 +43,8 @@ AWS services have usage-based billing. API Gateway throttling and per-IP control
 
 | Gate | Result |
 |---|---|
-| GitHub code, build, test, CI | **PENDING current final SHA** |
-| GitHub PR merged | **PENDING** |
+| GitHub code, build, test, CI | **PASS — PR SHA** ([run 40171764967](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/actions/runs/40171764967)); post-merge CI separately |
+| GitHub PR merged | **DONE** ([commit 41cdd6c](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/commit/41cdd6c0c35451b7d06dd47a363434c3baa79d13)) |
 | AWS deployment with public beta flags | **NOT VERIFIED** |
 | Amplify public release | **NOT VERIFIED** |
 | Anonymous user sends actual test brief into DynamoDB | **NOT VERIFIED** |
