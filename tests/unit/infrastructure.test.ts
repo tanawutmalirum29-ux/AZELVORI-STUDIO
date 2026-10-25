@@ -35,6 +35,32 @@ describe("AWS foundation safeguards", () => {
       }),
     ).not.toThrow();
   });
+  it("allows explicit founder-only staging pilot but never prod/dev or public intake", () => {
+    const privateStaging = {
+      ...options,
+      stage: "staging" as const,
+      appOrigin: "https://studio.example",
+      pilotEnabled: true,
+      lambdaConcurrency: "shared" as const,
+    };
+    expect(() => validateOptions(privateStaging)).not.toThrow();
+    expect(() => validateOptions({ ...privateStaging, stage: "prod", legalReady: true,
+      budgetEmail: "ops@example.com", budgetUsd: 25 })).toThrow("Founder-only pilot");
+    expect(() => validateOptions({ ...privateStaging, stage: "dev" })).toThrow("Founder-only pilot");
+    expect(() => validateOptions({ ...privateStaging, intakeEnabled: true, legalReady: true })).toThrow();
+    const template = Template.fromStack(new FoundationStack(new App(), "PrivatePilot", privateStaging));
+    template.hasResourceProperties("AWS::Lambda::Function", {
+      Environment: { Variables: Match.objectLike({
+        INTAKE_ENABLED: "false", PILOT_ENABLED: "true",
+      }) },
+    });
+    template.hasResourceProperties("AWS::ApiGatewayV2::Route", {
+      RouteKey: "POST /api/v1/admin/pilot/leads",
+      AuthorizationType: "JWT",
+      AuthorizationScopes: ["azelvori/access", "aws.cognito.signin.user.admin"],
+    });
+    template.hasOutput("PilotEnabled", { Value: "true" });
+  });
   it("MFA, private identity, scoped JWT routes, retention and disabled intake are synthesized", () => {
     const template = Template.fromStack(
       new FoundationStack(new App(), "Test", options),

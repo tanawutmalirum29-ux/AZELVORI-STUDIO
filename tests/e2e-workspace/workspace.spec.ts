@@ -107,6 +107,7 @@ async function setup(page: Page, staff = false, verified = true) {
     crmUnavailable: false,
     crmForbidden: false,
     adminRequests: [] as string[],
+    pilotReceipts: [] as string[],
     employees: [] as Array<{ key: string; userId: string; role: "EMPLOYEE";
       firstName: string; lastName: string; nickname: string; active: boolean;
       version: number; createdAt: string; revokedAt?: string }>,
@@ -130,6 +131,10 @@ async function setup(page: Page, staff = false, verified = true) {
     const fail = (status: number, message: string) =>
       send({ error: { code: "TEST_FAILURE", message } }, status);
     if (method === "OPTIONS") return route.fulfill({ status: 204, headers });
+    if (path === "/health") return send({
+      status: "ok", service: "azelvori-api",
+      intakeEnabled: false, pilotEnabled: true,
+    });
     if (path === "/me") return send(state.identity);
     if (path === "/me/email/request") {
       state.requestedCode = true;
@@ -172,6 +177,19 @@ async function setup(page: Page, staff = false, verified = true) {
         state.employees = state.employees.map(e => e.key === key ? employee : e);
         return send({ employee });
       }
+    }
+    if (path === "/admin/pilot/leads" && method === "POST") {
+      if (!staff) return fail(403, "ไม่มีสิทธิ์ทดสอบ");
+      const idem = request.headers()["idempotency-key"];
+      state.pilotReceipts.push(idem);
+      state.lead = {
+        ...state.lead,
+        title: "[TEST PILOT] เว็บไซต์ทดสอบ " + idem.slice(0, 8),
+        contactEmail: "pilot@example.com",
+        contactName: "AZELVORI TEST PILOT",
+        status: "NEW",
+      };
+      return send({ leadId: state.lead.leadId, receivedAt: date, status: "RECEIVED" }, 202);
     }
     if (path.startsWith("/admin/leads")) {
       state.adminRequests.push(`${method} ${path}`);
@@ -284,6 +302,29 @@ async function layout(page: Page, info: TestInfo, name: string) {
     fullPage: true,
   });
 }
+test("founder pilot creates a real-backed synthetic lead flow without opening public intake", async ({ page }, info) => {
+  const state = await setup(page, true);
+  await page.goto("/admin/pilot");
+  await expect(page.getByRole("heading", { name: "ทดลองระบบงานจริง" })).toBeVisible();
+  const create = page.getByRole("button", { name: "สร้างบรีฟทดสอบในฐานข้อมูลจริง" });
+  await expect(create).toBeEnabled();
+  await create.click();
+  await expect(page.getByText(/บันทึกลงระบบจริงแล้ว เลขรับเรื่อง/)).toBeVisible();
+  expect(state.pilotReceipts).toHaveLength(1);
+  expect(state.lead.title).toContain("[TEST PILOT]");
+  expect(state.lead.contactEmail).toBe("pilot@example.com");
+  await expect(page.getByRole("button", { name: "สร้างบรีฟทดสอบในฐานข้อมูลจริง" })).toHaveCount(0);
+  await page.getByRole("link", { name: "คิวงาน", exact: true }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page.getByText(/TEST PILOT/).first()).toBeVisible();
+  await layout(page, info, "live-founder-pilot");
+});
+test("customer cannot see founder pilot data or trigger test lead writes", async ({ page }) => {
+  const state = await setup(page, false);
+  await page.goto("/admin/pilot");
+  await expect(page.getByText(/โหมดทดสอบงานจริงใช้ได้เฉพาะบัญชีเจ้าของสตูดิโอ/)).toBeVisible();
+  expect(state.pilotReceipts).toHaveLength(0);
+});
 test("founder reissues a disabled employee key with a new password and no old account reuse", async ({ page }, info) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "clipboard", { configurable: true, value: {

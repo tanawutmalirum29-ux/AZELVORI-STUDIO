@@ -14,6 +14,12 @@
 - **Acceptance:** Cypress is not used; Playwright tests should confirm copy values, reveal/hide, clipboard denied, confirmation gating, previous issuance/reissue behavior, no extra storage, accessibility, Chromium/WebKit five viewports, and CI build/synth/dependency audit.
 - **Production verification:** NOT VERIFIED. Must check Amplify publishes the merged frontend and manually validate mobile clipboard permissions; no AWS/CDK deploy required for this frontend-only fix.
 
+### PILOT-01 — Founder live pilot on AWS Staging
+- **Status: IN REVIEW, NOT DEPLOYED** — [Founder Live Pilot guide](../../docs/23_FOUNDER_LIVE_PILOT.md); PR with CI evidence required.
+- **What this enables:** Authenticated founder (validated JWT + server-side active founder grant) may create non-PII test leads in the **real DynamoDB** intake/CRM workflow while public intake remains disabled. Adds `/admin/pilot` checklist to exercise existing founder, staff, customer project, invitation, message and milestone paths with test identities.
+- **What it does NOT enable:** public intake, payment processing, file attachments, customer self-signup, legal release approval, realtime notifications; they remain explicitly unavailable.
+- **Rollout:** Existing `Azelvori-staging`, `pilotEnabled=true` with `intakeEnabled=false`, `legalReady=false`, `lambdaConcurrency=shared`; operator must review CDK diff and complete CloudShell deploy. Verify Amplify build from same main SHA. No live results claimed without actual operator test.
+
 ## Critical/high work explicitly NOT done (for Work)
 
 | ID | Finding from audit | Status | Production impact / required verification |

@@ -25,6 +25,7 @@ const AdminInbox = lazy(() =>
   import("./pages/AdminInbox").then((m) => ({ default: m.AdminInbox })),
 );
 const AdminEmployees = lazy(() => import("./pages/AdminEmployees").then((m) => ({ default: m.AdminEmployees })));
+const AdminPilot = lazy(() => import("./pages/AdminPilot").then((m) => ({ default: m.AdminPilot })));
 const StaffLogin = lazy(() => import("./pages/Staff").then((m) => ({ default: m.StaffLogin })));
 const StaffInbox = lazy(() => import("./pages/Staff").then((m) => ({ default: m.StaffInbox })));
 const AdminSetup = lazy(() =>
@@ -52,6 +53,7 @@ const titles: Record<string, string> = {
   "/admin/projects": "จัดการโปรเจกต์",
   "/admin/inbox": "ข้อความลูกค้า",
   "/admin/employees": "จัดการพนักงาน",
+  "/admin/pilot": "ทดสอบระบบงานจริง",
   "/staff/login": "เข้าสู่ระบบพนักงาน",
   "/staff/inbox": "แชทและงานพนักงาน",
   "/invite": "คำเชิญเข้าโปรเจกต์",
@@ -72,6 +74,7 @@ function Route() {
   if (path === "/admin/setup") return <AdminSetup />;
   if (path === "/admin/inbox") return <AdminInbox />;
   if (path === "/admin/employees") return <AdminEmployees />;
+  if (path === "/admin/pilot") return <AdminPilot />;
   if (path === "/staff/login") return <StaffLogin />;
   if (path === "/staff/inbox") return <StaffInbox />;
   if (path === "/app" || path === "/admin/projects")
