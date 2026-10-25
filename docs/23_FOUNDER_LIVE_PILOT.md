@@ -52,10 +52,10 @@ Once output is reviewed and acceptable, use the same command replacing `diff` wi
 
 | Check | State | Proof |
 |---|---|---|
-| Code + contract tests | PENDING | PR CI |
-| JWT founder negative tests | PENDING | `tests/integration/api.test.ts` |
-| CDK staging/prod guardrails | PENDING | `tests/unit/infrastructure.test.ts` |
-| Chromium/WebKit mobile E2E | PENDING | `tests/e2e-workspace/workspace.spec.ts` |
-| Merge to `main` | PENDING | PR merge SHA |
+| Code + contract tests | **PASS** | [PR #11 QA 40168690843](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/actions/runs/40168690843) |
+| JWT founder negative tests | **PASS** | `tests/integration/api.test.ts`, [CI](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/actions/runs/40168690843) |
+| CDK staging/prod guardrails | **PASS** | `tests/unit/infrastructure.test.ts`, [CI](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/actions/runs/40168690843) |
+| Chromium/WebKit mobile E2E | **PASS (synthetic)** | `tests/e2e-workspace/workspace.spec.ts`, [CI](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/actions/runs/40168690843) |
+| Merge to `main` | **DONE** | [Commit `0bf1e84`](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/commit/0bf1e84c2b7392cab6edbc089a75e4a3cec45ac1) |
 | Amplify/CloudFormation release | **NOT VERIFIED** | AWS operator evidence required |
 | Live Cognito/DynamoDB end-to-end | **NOT VERIFIED** | Test account + real AWS only |
