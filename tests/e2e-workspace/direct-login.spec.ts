@@ -65,6 +65,10 @@ test("first-party founder signs in with Cognito TOTP and keeps password out of s
   const storage = await page.evaluate(() => JSON.stringify({ ...sessionStorage }));
   expect(storage).not.toContain("temporary-passphrase");
   expect(storage).not.toContain("123456");
+  const savedToken = await page.evaluate(() => localStorage.getItem("azelvori:direct-cognito-session"));
+  expect(savedToken).toContain("native-refresh-test");
+  expect(savedToken).not.toContain("native-access-test");
+  expect(savedToken).not.toContain("native-id-test");
   expect(requests.map((item) => item.target)).toEqual([
     "AWSCognitoIdentityProviderService.InitiateAuth",
     "AWSCognitoIdentityProviderService.RespondToAuthChallenge",
