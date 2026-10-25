@@ -32,6 +32,7 @@ export function FirstPartyLogin({ mode, denied = false, reason = "" }: {
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
   const [visible, setVisible] = useState(false);
+  const [rememberDevice, setRememberDevice] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const configured = directConfigured && /^https:\/\//.test(apiBase);
@@ -75,7 +76,7 @@ export function FirstPartyLogin({ mode, denied = false, reason = "" }: {
     setError("");
     setNotice("");
     try {
-      const next = await startNativeLogin(email, password);
+      const next = await startNativeLogin(email, password, rememberDevice);
       setPassword("");
       await completed(next);
     } catch (failure) {
@@ -207,6 +208,11 @@ export function FirstPartyLogin({ mode, denied = false, reason = "" }: {
                     onClick={() => setVisible(!visible)}>{visible ? "ซ่อน" : "แสดง"}</button>
                 </span>
               </div>
+              <label className="remember-device">
+                <input type="checkbox" checked={rememberDevice} disabled={busy}
+                  onChange={(event) => setRememberDevice(event.target.checked)} />
+                <span>จำการเข้าสู่ระบบบนเครื่องนี้ (แนะนำสำหรับเครื่องส่วนตัว)</span>
+              </label>
               <button className="button full" disabled={!configured || busy}>
                 {busy ? "กำลังตรวจสอบ…" : mode === "admin" ? "เข้าสู่ระบบผู้ดูแล" : "เข้าสู่พื้นที่ลูกค้า"} <Icon name="arrow" size={18} />
               </button>
