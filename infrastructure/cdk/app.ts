@@ -256,6 +256,15 @@ export class FoundationStack extends Stack {
     const jwt = new authorizers.HttpJwtAuthorizer("CognitoJwt", issuer, {
       jwtAudience: [client.userPoolClientId],
     });
+    // Bind the shared HttpLambdaIntegration to the original first route
+    // before registering additional employee endpoints. CDK derives its logical
+    // ID from the first binding: changing that would replace the integration
+    // and unnecessarily re-point every existing customer/admin API route.
+    api.addRoutes({
+      path: "/health",
+      methods: [apigateway.HttpMethod.GET],
+      integration,
+    });
     const employeeJwt = new authorizers.HttpJwtAuthorizer("EmployeeCognitoJwt",
       "https://cognito-idp." + this.region + "." + this.urlSuffix + "/" + employeePool.userPoolId, {
         jwtAudience: [employeeClient.userPoolClientId],
@@ -290,11 +299,6 @@ export class FoundationStack extends Stack {
         authorizationScopes: ["aws.cognito.signin.user.admin"],
       });
     }
-    api.addRoutes({
-      path: "/health",
-      methods: [apigateway.HttpMethod.GET],
-      integration,
-    });
     api.addRoutes({
       path: "/api/v1/leads",
       methods: [apigateway.HttpMethod.POST],

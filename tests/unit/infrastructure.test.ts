@@ -156,6 +156,23 @@ describe("AWS foundation safeguards", () => {
     template.hasOutput("EmployeePoolId", { Value: Match.anyValue() });
     template.hasOutput("EmployeeClientId", { Value: Match.anyValue() });
   });
+  it("keeps existing API Lambda integration logical ID stable when adding employee routes", () => {
+    const template = Template.fromStack(
+      new FoundationStack(new App(), "StableIntegration", options),
+    );
+    const integrations = template.findResources("AWS::ApiGatewayV2::Integration");
+    const stableId = Object.keys(integrations).find((id) =>
+      id.startsWith("HttpApiGEThealthApiHandler"),
+    );
+    expect(stableId).toBeDefined();
+    expect(Object.keys(integrations)).toHaveLength(1);
+    const routes = Object.values(
+      template.findResources("AWS::ApiGatewayV2::Route"),
+    ) as { Properties: { Target?: unknown } }[];
+    for (const route of routes) {
+      expect(JSON.stringify(route.Properties.Target)).toContain(stableId!);
+    }
+  });
   it("supports low-quota private staging without a Lambda reservation and with lower route throttles", () => {
     const template = Template.fromStack(
       new FoundationStack(new App(), "SharedStaging", {
