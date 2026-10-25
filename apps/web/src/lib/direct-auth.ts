@@ -33,13 +33,32 @@ export type SignInStep =
   | ({ kind: "new-password" } & Challenge);
 let instance: CognitoIdentityProviderClient | undefined;
 let inFlightRefresh: Promise<string> | undefined;
+let rememberNextLogin = false;
+function persistentSession() {
+  try { return !!localStorage.getItem(KEY); } catch { return false; }
+}
+function save(data: NativeSession, persistent: boolean) {
+  if (persistent) {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(data));
+      sessionStorage.removeItem(KEY);
+      return;
+    } catch { /* Private browser: fall back to tab-only. */ }
+  }
+  sessionStorage.setItem(KEY, JSON.stringify(data));
+  try { localStorage.removeItem(KEY); } catch { /* Restricted storage. */ }
+}
+function authRejected(error: unknown) {
+  return error instanceof Error &&
+    ["NotAuthorizedException", "UserNotFoundException", "InvalidParameterException"].includes(error.name);
+}
 function provider() {
   if (!directConfigured) throw new Error("การเข้าสู่ระบบยังไม่ได้ตั้งค่า");
   return instance ??= new CognitoIdentityProviderClient({ region });
 }
 function read(): NativeSession | undefined {
   try {
-    const raw = typeof sessionStorage.getItem === "function" ? sessionStorage.getItem(KEY) : null;
+    const raw = (persistentSession() ? localStorage.getItem(KEY) : sessionStorage.getItem(KEY));
     if (!raw) return;
     const data = JSON.parse(raw) as NativeSession;
     if (typeof data.access === "string" && typeof data.refresh === "string" &&
@@ -49,6 +68,7 @@ function read(): NativeSession | undefined {
 export function hasNativeSession() { return !!read(); }
 export function clearNativeSession() {
   sessionStorage.removeItem(KEY);
+  try { localStorage.removeItem(KEY); } catch { /* Restricted storage. */ }
 }
 function stored(result: { AccessToken?: string; IdToken?: string; RefreshToken?: string; ExpiresIn?: number }, previous?: NativeSession): SignInStep {
   if (!result.AccessToken || !result.IdToken || !(result.RefreshToken || previous?.refresh) ||
@@ -59,7 +79,7 @@ function stored(result: { AccessToken?: string; IdToken?: string; RefreshToken?:
     refresh: result.RefreshToken ?? previous!.refresh,
     expiresAt: Date.now() + result.ExpiresIn * 1000,
   };
-  sessionStorage.setItem(KEY, JSON.stringify(entry));
+  save(entry, previous ? persistentSession() : rememberNextLogin);
   return { kind: "done" };
 }
 type CognitoAnswer = {
@@ -86,7 +106,8 @@ async function next(answer: CognitoAnswer, previousUser: string): Promise<SignIn
   }
   throw new Error("บัญชีต้องการวิธียืนยันตัวตนเพิ่มเติม กรุณาใช้การเข้าสู่ระบบผ่าน Cognito");
 }
-export async function startNativeLogin(email: string, password: string): Promise<SignInStep> {
+export async function startNativeLogin(email: string, password: string, rememberDevice = false): Promise<SignInStep> {
+  rememberNextLogin = rememberDevice;
   const username = email.trim().toLowerCase();
   const response = await provider().send(new InitiateAuthCommand({
     ClientId: clientId,
@@ -139,8 +160,9 @@ export async function nativeAccessToken(): Promise<string> {
       if (read()?.refresh !== entry.refresh) throw new Error("เซสชันถูกยกเลิกแล้ว");
       stored(answer.AuthenticationResult, entry);
       return answer.AuthenticationResult.AccessToken!;
-    }).catch(() => {
-      if (read()?.refresh === entry.refresh) clearNativeSession();
+    }).catch((error: unknown) => {
+      // Offline or temporary AWS failures must not erase a trusted-device login.
+      if (authRejected(error) && read()?.refresh === entry.refresh) clearNativeSession();
       throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
     }).finally(() => { inFlightRefresh = undefined; });
   }
