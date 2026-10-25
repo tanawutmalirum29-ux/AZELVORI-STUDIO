@@ -5297,3 +5297,12 @@ dd {
 .remember-device { display:flex; align-items:flex-start; gap:10px; cursor:pointer; color:#d0ded8; font-size:13px; line-height:1.55; }
 .remember-device input[type="checkbox"] { width:18px; min-height:18px; height:18px; margin:2px 0 0; flex-shrink:0; accent-color:#a8e8df; }
 .remember-device:focus-within { outline:2px solid #86d6c6; outline-offset:3px; border-radius:5px; }
+
+/* Founder live pilot: keep instructions usable on phones and tablets. */
+.pilot-desk { margin-top: 20px; max-width: 900px; }
+.pilot-desk h2 { line-height: 1.35; }
+.pilot-desk strong { overflow-wrap: anywhere; }
+.pilot-steps { padding-inline-start: 24px; line-height: 1.85; }
+.pilot-steps li + li { margin-top: 12px; }
+.pilot-steps a { color: #a8e8df; text-decoration: underline; text-underline-offset: 2px; }
+.pilot-desk .button { max-width: 100%; white-space: normal; }
