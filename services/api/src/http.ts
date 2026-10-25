@@ -8,7 +8,7 @@ import type {
   APIGatewayProxyEventV2,
   APIGatewayProxyStructuredResultV2,
 } from "aws-lambda";
-import { IdempotencyKeySchema, LeadUpdateSchema } from "@azelvori/contracts";
+import { IdempotencyKeySchema, LeadUpdateSchema, PRIVACY_VERSION } from "@azelvori/contracts";
 import {
   authorizeStaff,
   HttpError,
@@ -20,6 +20,7 @@ import {
 
 export type ApiConfig = {
   intakeEnabled: boolean;
+  pilotEnabled?: boolean;
   allowedOrigin: string;
   workspace?: WorkspaceService;
   employees?: EmployeeService;
@@ -96,6 +97,51 @@ export function createHandler(repo: Repository, config: ApiConfig) {
         }
         const response = await workspaceRoute(event, config.workspace);
         if (response) return respond(response.status, response.body);
+      }
+      if (path === "/api/v1/admin/pilot/leads" && method === "POST") {
+        if (!config.pilotEnabled || config.intakeEnabled)
+          throw new HttpError(404, "NOT_FOUND", "โหมดทดสอบนี้ไม่ได้เปิดใช้งาน");
+        if (event.headers.origin !== config.allowedOrigin)
+          throw new HttpError(403, "ORIGIN_DENIED", "ไม่อนุญาตคำขอจากเว็บไซต์นี้");
+        // Only the JWT authorizer's verified access claims can identify the founder.
+        const jwt = (
+          event.requestContext as APIGatewayProxyEventV2["requestContext"] & {
+            authorizer?: { jwt?: { claims?: Record<string, unknown> } };
+          }
+        ).authorizer?.jwt?.claims;
+        if (!hasValidatedAccessClaims(jwt))
+          throw new HttpError(401, "UNAUTHENTICATED", "กรุณาเข้าสู่ระบบใหม่");
+        await authorizeStaff(repo, jwt.sub);
+        const key = IdempotencyKeySchema.safeParse(event.headers["idempotency-key"]);
+        if (!key.success)
+          throw new HttpError(400, "INVALID_KEY", "คำขอขาดรหัสยืนยัน");
+        // The server, not the browser, constructs a clearly labelled synthetic
+        // lead. Never accept real names, emails or project descriptions here.
+        // Identical idempotency keys produce identical stored bodies on retries.
+        const pilotLead = {
+          serviceType: "WEBSITE",
+          title: "[TEST PILOT] เว็บไซต์ทดสอบ " + key.data.slice(0, 8),
+          description: "ข้อมูลจำลองสำหรับทดสอบระบบรับบรีฟ คิวงาน และโปรเจกต์จริงบน Staging เท่านั้น ไม่ใช่งานลูกค้าและไม่เรียกเก็บเงิน",
+          platform: "Web / iOS / Android",
+          engine: "",
+          expected: "",
+          actual: "",
+          reproduction: "",
+          severity: "MEDIUM",
+          budget: "DISCUSS",
+          timeline: "FLEXIBLE",
+          targetDate: "",
+          referenceUrl: "",
+          contactName: "AZELVORI TEST PILOT",
+          contactEmail: "pilot@example.com",
+          privacyAcknowledged: true,
+          privacyVersion: PRIVACY_VERSION,
+          rightsConfirmed: true,
+          website: "",
+        };
+        return respond(202, await submitLead(
+          repo, pilotLead, key.data, "pilot:" + jwt.sub,
+        ));
       }
       if (
         path === "/api/v1/admin/leads" ||
