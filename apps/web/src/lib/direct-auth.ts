@@ -34,19 +34,27 @@ export type SignInStep =
 let instance: CognitoIdentityProviderClient | undefined;
 let inFlightRefresh: Promise<string> | undefined;
 let rememberNextLogin = false;
-function persistentSession() {
-  try { return !!localStorage.getItem(KEY); } catch { return false; }
+type TabNativeSession = NativeSession & { remembered?: boolean };
+function persistentRefresh() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as { refresh?: unknown };
+    return typeof parsed.refresh === "string" && parsed.refresh ? parsed.refresh : undefined;
+  } catch { return; }
 }
-function save(data: NativeSession, persistent: boolean) {
-  if (persistent) {
+/** Durable state has only the refresh token, never access or ID JWTs. */
+function save(data: NativeSession, remember: boolean) {
+  let persisted = false;
+  if (remember) {
     try {
-      localStorage.setItem(KEY, JSON.stringify(data));
-      sessionStorage.removeItem(KEY);
-      return;
-    } catch { /* Private browser: fall back to tab-only. */ }
+      localStorage.setItem(KEY, JSON.stringify({ refresh: data.refresh }));
+      persisted = true;
+    } catch { /* Private mode: fall back to this browser tab only. */ }
+  } else {
+    try { localStorage.removeItem(KEY); } catch { /* Restricted storage. */ }
   }
-  sessionStorage.setItem(KEY, JSON.stringify(data));
-  try { localStorage.removeItem(KEY); } catch { /* Restricted storage. */ }
+  sessionStorage.setItem(KEY, JSON.stringify({ ...data, remembered: persisted }));
 }
 function authRejected(error: unknown) {
   return error instanceof Error &&
@@ -57,13 +65,19 @@ function provider() {
   return instance ??= new CognitoIdentityProviderClient({ region });
 }
 function read(): NativeSession | undefined {
+  const refresh = persistentRefresh();
   try {
-    const raw = (persistentSession() ? localStorage.getItem(KEY) : sessionStorage.getItem(KEY));
-    if (!raw) return;
-    const data = JSON.parse(raw) as NativeSession;
-    if (typeof data.access === "string" && typeof data.refresh === "string" &&
-        typeof data.expiresAt === "number" && typeof data.id === "string") return data;
-  } catch { /* Corrupt storage is never authentication. */ }
+    const raw = sessionStorage.getItem(KEY);
+    if (raw) {
+      const data = JSON.parse(raw) as TabNativeSession;
+      if (typeof data.access === "string" && typeof data.refresh === "string" &&
+          typeof data.expiresAt === "number" && typeof data.id === "string") {
+        if (data.remembered && (!refresh || refresh !== data.refresh)) return;
+        return data;
+      }
+    }
+    if (refresh) return { access: "", refresh, id: "", expiresAt: 0 };
+  } catch { /* Corrupt storage cannot authenticate a user. */ }
 }
 export function hasNativeSession() { return !!read(); }
 export function clearNativeSession() {
@@ -79,7 +93,7 @@ function stored(result: { AccessToken?: string; IdToken?: string; RefreshToken?:
     refresh: result.RefreshToken ?? previous!.refresh,
     expiresAt: Date.now() + result.ExpiresIn * 1000,
   };
-  save(entry, previous ? persistentSession() : rememberNextLogin);
+  save(entry, previous ? !!persistentRefresh() : rememberNextLogin);
   return { kind: "done" };
 }
 type CognitoAnswer = {
