@@ -59,6 +59,59 @@ describe("HTTP integration / public and admin boundaries", () => {
     expect(r.audit).toHaveLength(1);
     expect(result.body).not.toContain("test@example.com");
   });
+  it("creates real persisted pilot lead for verified founder while public intake stays closed", async () => {
+    const r = new MemoryRepository();
+    r.staff.set("founder", { userId: "founder", active: true, role: "FOUNDER_ADMIN" });
+    const h = createHandler(r, { ...config, intakeEnabled: false, pilotEnabled: true });
+    const e = event("/api/v1/admin/pilot/leads", "POST", {
+      contactName: "user PII should not be accepted", contactEmail: "user@real.example",
+    }, staffClaims);
+    const a = await h(e);
+    expect(a.statusCode).toBe(202);
+    const receipt = JSON.parse(a.body!);
+    const stored = r.leads.get(receipt.leadId)!;
+    expect(stored.title).toContain("[TEST PILOT]");
+    expect(stored.contactEmail).toBe("pilot@example.com");
+    expect(stored.contactName).toBe("AZELVORI TEST PILOT");
+    expect(JSON.stringify(stored)).not.toContain("user PII");
+    expect(JSON.stringify(stored)).not.toContain("user@real.example");
+    expect(r.audit).toHaveLength(1);
+    const repeat = await h(e);
+    expect(repeat.statusCode).toBe(202);
+    expect(JSON.parse(repeat.body!).leadId).toBe(receipt.leadId);
+    expect(r.leads.size).toBe(1);
+    expect((await h(event("/api/v1/leads", "POST"))).statusCode).toBe(503);
+  });
+  it("denies anonymous, revoked, forged-scope or cross-origin pilot submissions", async () => {
+    const r = new MemoryRepository();
+    const h = createHandler(r, { ...config, intakeEnabled: false, pilotEnabled: true });
+    r.staff.set("founder", { userId: "founder", active: true, role: "FOUNDER_ADMIN" });
+    const cases = [
+      event("/api/v1/admin/pilot/leads", "POST", {}, undefined),
+      event("/api/v1/admin/pilot/leads", "POST", {}, { ...staffClaims, token_use: "id" }),
+      event("/api/v1/admin/pilot/leads", "POST", {}, { ...staffClaims, sub: "non-founder" }),
+      event("/api/v1/admin/pilot/leads", "POST", {}, { ...staffClaims, scope: "openid" }),
+    ];
+    for (const e of cases) expect((await h(e)).statusCode).toBeGreaterThanOrEqual(401);
+    const wrongOrigin = event("/api/v1/admin/pilot/leads", "POST", {}, staffClaims);
+    wrongOrigin.headers.origin = "https://evil.example";
+    expect((await h(wrongOrigin)).statusCode).toBe(403);
+    r.staff.get("founder")!.active = false;
+    expect((await h(event("/api/v1/admin/pilot/leads", "POST", {}, staffClaims))).statusCode).toBe(403);
+    expect(r.leads.size).toBe(0);
+    expect(r.audit).toHaveLength(0);
+  });
+  it("hides pilot route outside explicitly enabled private staging", async () => {
+    const r = new MemoryRepository();
+    r.staff.set("founder", { userId: "founder", active: true, role: "FOUNDER_ADMIN" });
+    for (const pilotEnabled of [false, undefined]) {
+      const h = createHandler(r, { ...config, intakeEnabled: false, pilotEnabled });
+      expect((await h(event("/api/v1/admin/pilot/leads", "POST", {}, staffClaims))).statusCode).toBe(404);
+    }
+    const h = createHandler(r, { ...config, intakeEnabled: true, pilotEnabled: true });
+    expect((await h(event("/api/v1/admin/pilot/leads", "POST", {}, staffClaims))).statusCode).toBe(404);
+    expect(r.leads.size).toBe(0);
+  });
   it("closed intake fails closed and never stores data", async () => {
     const r = new MemoryRepository();
     expect(
