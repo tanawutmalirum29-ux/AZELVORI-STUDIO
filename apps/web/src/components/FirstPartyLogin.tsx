@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Notice } from "./Layout";
 import { Icon } from "./Icon";
 import { authConfigured, logout, signIn } from "../lib/auth";
@@ -6,6 +6,7 @@ import {
   answerNativeChallenge,
   confirmPasswordRecovery,
   directConfigured,
+  hasNativeSession,
   logoutNative,
   readableNativeError,
   startNativeLogin,
@@ -32,11 +33,32 @@ export function FirstPartyLogin({ mode, denied = false, reason = "" }: {
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
   const [visible, setVisible] = useState(false);
+  const [rememberDevice, setRememberDevice] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const configured = directConfigured && /^https:\/\//.test(apiBase);
   const destination = mode === "admin" ? "/admin" :
     new URLSearchParams(location.search).get("continue") === "invite" ? "/invite" : "/app";
+
+  useEffect(() => {
+    if (denied || !hasNativeSession()) return;
+    let mounted = true;
+    void workspaceApi.me().then(async (me) => {
+      if (!mounted) return;
+      if (mode === "admin" && !me.staff) {
+        await logoutNative();
+        if (mounted) setError("บัญชีนี้ยังไม่มีสิทธิ์ผู้ดูแล");
+        return;
+      }
+      location.replace(destination);
+    }).catch((failure: unknown) => {
+      if (!mounted) return;
+      if (failure instanceof ApiError && [401, 403].includes(failure.status)) {
+        void logoutNative();
+      }
+    });
+    return () => { mounted = false; };
+  }, [denied, mode, destination]);
 
   function report(error: unknown) {
     setError(readableNativeError(error));
@@ -75,7 +97,7 @@ export function FirstPartyLogin({ mode, denied = false, reason = "" }: {
     setError("");
     setNotice("");
     try {
-      const next = await startNativeLogin(email, password);
+      const next = await startNativeLogin(email, password, rememberDevice);
       setPassword("");
       await completed(next);
     } catch (failure) {
@@ -207,6 +229,11 @@ export function FirstPartyLogin({ mode, denied = false, reason = "" }: {
                     onClick={() => setVisible(!visible)}>{visible ? "ซ่อน" : "แสดง"}</button>
                 </span>
               </div>
+              <label className="remember-device">
+                <input type="checkbox" checked={rememberDevice} disabled={busy}
+                  onChange={(event) => setRememberDevice(event.target.checked)} />
+                <span>จำการเข้าสู่ระบบบนเครื่องนี้ (แนะนำสำหรับเครื่องส่วนตัว)</span>
+              </label>
               <button className="button full" disabled={!configured || busy}>
                 {busy ? "กำลังตรวจสอบ…" : mode === "admin" ? "เข้าสู่ระบบผู้ดูแล" : "เข้าสู่พื้นที่ลูกค้า"} <Icon name="arrow" size={18} />
               </button>

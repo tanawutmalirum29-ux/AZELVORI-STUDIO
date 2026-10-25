@@ -13,12 +13,19 @@ vi.mock("@aws-sdk/client-cognito-identity-provider", () => ({
 }));
 
 let store: Map<string, string>;
+let remembered: Map<string, string>;
 beforeEach(() => {
   vi.resetModules();
   sdk.send.mockReset();
   vi.stubEnv("VITE_COGNITO_AUTHORITY", "https://cognito-idp.ap-southeast-2.amazonaws.com/ap-southeast-2_TEST");
   vi.stubEnv("VITE_COGNITO_CLIENT_ID", "public-client");
   store = new Map();
+  remembered = new Map();
+  vi.stubGlobal("localStorage", {
+    getItem: (key: string) => remembered.get(key) ?? null,
+    setItem: (key: string, value: string) => remembered.set(key, value),
+    removeItem: (key: string) => remembered.delete(key),
+  });
   vi.stubGlobal("sessionStorage", {
     getItem: (key: string) => store.get(key) ?? null,
     setItem: (key: string, value: string) => store.set(key, value),
@@ -100,6 +107,50 @@ describe("Cognito first-party identity contract", () => {
     expect(auth.hasNativeSession()).toBe(false);
     await expect(auth.nativeAccessToken()).rejects.toThrow("เซสชันหมดอายุ");
     vi.restoreAllMocks();
+  });
+  it("remembers only a refresh token, survives a new tab, and revokes on logout", async () => {
+    sdk.send.mockResolvedValueOnce({ AuthenticationResult: tokens });
+    const auth = await import("../../apps/web/src/lib/direct-auth");
+    expect(await auth.startNativeLogin("admin@example.com", "password", true))
+      .toEqual({ kind: "done" });
+    expect(JSON.stringify([...remembered.values()])).not.toContain("access-example");
+    expect(JSON.stringify([...remembered.values()])).not.toContain("id-example");
+    expect(JSON.stringify([...remembered.values()])).toContain("refresh-example");
+    store.clear(); // Simulated browser tab closing and reopening.
+    expect(auth.hasNativeSession()).toBe(true);
+    sdk.send.mockResolvedValueOnce({
+      AuthenticationResult: { AccessToken: "new-access", IdToken: "new-id", ExpiresIn: 300 },
+    });
+    expect(await auth.nativeAccessToken()).toBe("new-access");
+    expect(sdk.send.mock.calls[1][0].input.AuthFlow).toBe("REFRESH_TOKEN_AUTH");
+    expect(store.size).toBe(1);
+    sdk.send.mockResolvedValueOnce({});
+    await auth.logoutNative();
+    expect(auth.hasNativeSession()).toBe(false);
+    expect(remembered.size).toBe(0);
+    expect(store.size).toBe(0);
+  });
+  it("keeps an unchecked login tab-only", async () => {
+    sdk.send.mockResolvedValueOnce({ AuthenticationResult: tokens });
+    const auth = await import("../../apps/web/src/lib/direct-auth");
+    await auth.startNativeLogin("admin@example.com", "password", false);
+    expect(remembered.size).toBe(0);
+    expect(auth.hasNativeSession()).toBe(true);
+    store.clear();
+    expect(auth.hasNativeSession()).toBe(false);
+  });
+  it("does not erase remembered session on network interruption", async () => {
+    sdk.send.mockResolvedValueOnce({ AuthenticationResult: tokens });
+    const auth = await import("../../apps/web/src/lib/direct-auth");
+    await auth.startNativeLogin("admin@example.com", "password", true);
+    store.clear();
+    sdk.send.mockRejectedValueOnce(new Error("network failure"));
+    await expect(auth.nativeAccessToken()).rejects.toThrow("เซสชันหมดอายุ");
+    expect(remembered.size).toBe(1);
+    sdk.send.mockResolvedValueOnce({
+      AuthenticationResult: { AccessToken: "recovered", IdToken: "recovered-id", ExpiresIn: 300 },
+    });
+    expect(await auth.nativeAccessToken()).toBe("recovered");
   });
   it("maps known AWS exceptions to safe user messages", async () => {
     const auth = await import("../../apps/web/src/lib/direct-auth");

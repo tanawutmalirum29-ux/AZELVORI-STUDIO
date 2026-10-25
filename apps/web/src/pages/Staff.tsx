@@ -24,13 +24,27 @@ export function StaffLogin() {
   const [key, setKey] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [rememberDevice, setRememberDevice] = useState(true);
   const [error, setError] = useState("");
+  useEffect(() => {
+    if (!employeeSessionExists()) return;
+    let mounted = true;
+    void staffApi<Employee>("/me").then(() => {
+      if (mounted) location.replace("/staff/inbox");
+    }).catch((error: unknown) => {
+      if (!mounted) return;
+      if ((error as ApiError)?.status === 401 || (error as ApiError)?.status === 403 ||
+          !employeeSessionExists()) clearEmployeeSession();
+      // Offline access remains saved; avoid deleting trusted-device credentials.
+    });
+    return () => { mounted = false; };
+  }, []);
   async function enter(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (busy) return;
     setBusy(true); setError("");
     try {
-      await employeeLogin(key.trim(), password);
+      await employeeLogin(key.trim(), password, rememberDevice);
       await staffApi<Employee>("/me");
       setPassword("");
       location.assign("/staff/inbox");
@@ -65,11 +79,16 @@ export function StaffLogin() {
             <input type="password" autoComplete="current-password" required value={password}
               onChange={(e) => setPassword(e.target.value)} disabled={busy} />
           </label>
+          <label className="remember-device">
+            <input type="checkbox" checked={rememberDevice} disabled={busy}
+              onChange={(e) => setRememberDevice(e.target.checked)} />
+            <span>จำเครื่องนี้ ไม่ต้องเข้าสู่ระบบซ้ำเมื่อปิดเบราว์เซอร์</span>
+          </label>
           <button className="button full" disabled={busy || !key || !password}>
             {busy ? "กำลังตรวจสอบ…" : "เข้าสู่พื้นที่พนักงาน"}
           </button>
         </form>
-        <p className="first-party-support">บัญชีไม่มีวันหมดอายุโดยอัตโนมัติ แอดมินเป็นผู้ปิดสิทธิ์เท่านั้น</p>
+        <p className="first-party-support">จำเครื่องได้นานสูงสุด 1 ปี หากแอดมินปิดคีย์ สิทธิ์ใช้งานจะสิ้นสุดทันที</p>
         <nav className="first-party-links"><a href="/">กลับหน้าเว็บไซต์</a></nav>
       </section>
     </div>
@@ -93,7 +112,7 @@ export function StaffInbox() {
   const pending = useRef<{ key: string; text: string; project: string } | undefined>(undefined);
   const lock = useRef(false);
   function handleError(err: unknown) {
-    if ((err as ApiError)?.status === 403 || (err as ApiError)?.status === 401) {
+    if (!employeeSessionExists() || (err as ApiError)?.status === 403 || (err as ApiError)?.status === 401) {
       clearEmployeeSession();
       location.assign("/staff/login");
       return;
@@ -103,6 +122,15 @@ export function StaffInbox() {
   useEffect(() => {
     if (!employeeSessionExists()) { location.replace("/staff/login"); return; }
     let active = true;
+    // Recheck employee authorization even with no open conversation. A founder
+    // can disable a key at any moment, independently of refresh-token expiry.
+    const verifyActive = () => {
+      if (active && !document.hidden) void staffApi<Employee>("/me")
+        .catch((err) => { if (active) handleError(err); });
+    };
+    const activeInterval = setInterval(verifyActive, 60000);
+    const onVisible = () => { if (!document.hidden) verifyActive(); };
+    document.addEventListener("visibilitychange", onVisible);
     void Promise.all([
       staffApi<Employee>("/me"),
       staffApi<{items: StudioProject[]; nextCursor?: string}>("/projects"),
@@ -112,7 +140,8 @@ export function StaffInbox() {
       setSelected(page.items[0]?.projectId);
     }).catch((err) => { if (active) handleError(err); })
       .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    return () => { active = false; clearInterval(activeInterval);
+      document.removeEventListener("visibilitychange", onVisible); };
   }, []);
   useEffect(() => {
     if (!selected) return;

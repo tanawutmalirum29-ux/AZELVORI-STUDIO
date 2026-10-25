@@ -27,6 +27,7 @@ export function auth() {
       silentRequestTimeoutInSeconds: 15,
       requestTimeoutInSeconds: 15,
       loadUserInfo: false,
+      // Hosted OAuth fallback stays tab-scoped; first-party login has an explicit trusted-device option.
       userStore: new WebStorageStateStore({ store: sessionStorage }),
       stateStore: new WebStorageStateStore({ store: sessionStorage }),
       metadata: {
@@ -151,9 +152,15 @@ export async function accessToken(): Promise<string> {
           throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
         return renewed.access_token;
       })
-      .catch(async () => {
-        await auth().removeUser();
-        throw new Error("ต่ออายุเซสชันไม่สำเร็จ กรุณาเข้าสู่ระบบใหม่");
+      .catch(async (error: unknown) => {
+        const denial = error as { error?: string; name?: string; message?: string } | null;
+        if (denial && (denial.error === "invalid_grant" ||
+            denial.name === "invalid_grant" || denial.message === "invalid_grant" ||
+            denial.name === "NotAuthorizedException")) {
+          await auth().removeUser();
+          throw new Error("เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่");
+        }
+        throw new Error("เชื่อมต่อไม่ได้ชั่วคราว กรุณาลองอีกครั้ง");
       })
       .finally(() => {
         refreshing = undefined;
