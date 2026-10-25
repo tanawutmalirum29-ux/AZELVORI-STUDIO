@@ -38,6 +38,8 @@ jobs:
             test-results/
             workspace-report/
             workspace-test-results/
+            public-report/
+            public-test-results/
             apps/web/dist/
             cdk.out/*.template.json
           retention-days: 14
