@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { intakeEnabled } from "../lib/api";
 import { Icon, Mark } from "./Icon";
 export function Logo() {
   return (
@@ -79,7 +80,7 @@ export function Footer() {
             <a href="/cookies">การจัดเก็บข้อมูล</a>
             <a href="/admin/login">สำหรับผู้ดูแล</a>
           </div>
-          <span className="alpha-label">DEVELOPMENT PREVIEW</span>
+          <span className="alpha-label">{intakeEnabled ? "เปิดรับบรีฟ · ยังไม่เปิดจ่ายเงิน" : "DEVELOPMENT PREVIEW"}</span>
         </div>
       </div>
     </footer>
