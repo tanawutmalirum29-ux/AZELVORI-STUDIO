@@ -29,7 +29,7 @@ export const BUDGET_LABELS: Record<(typeof BUDGETS)[number], string> = {
   "60000_PLUS": "60,000 บาทขึ้นไป",
   DISCUSS: "ขอคำแนะนำเรื่องงบ",
 };
-export const PRIVACY_VERSION = "alpha-2026-10-23";
+export const PRIVACY_VERSION = "public-beta-2026-10-25";
 const shortText = z.string().trim().max(200);
 const optionalText = z.string().trim().max(3000).default("");
 const LeadFields = z
