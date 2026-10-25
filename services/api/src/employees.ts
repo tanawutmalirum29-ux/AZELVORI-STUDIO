@@ -4,7 +4,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, UpdateCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { z } from "zod";
 import { authorizeStaff, HttpError, type Repository } from "./domain";
-import { meta, row, check, type WorkspaceStore } from "./workspace-store";
+import { meta, row, check, type WorkspaceStore, type Row } from "./workspace-store";
 import type { Actor } from "./identity";
 
 export const employeeInput = z.object({
@@ -74,7 +74,7 @@ export class EmployeeService {
    */
   private async issue(
     actor: Actor, key: string, parsed: z.infer<typeof employeeInput>,
-    previous?: Awaited<ReturnType<WorkspaceStore["get<Employee>"]>>,
+    previous?: Row<Employee>,
   ) {
     const issue = await this.nextIssue();
     // Password is globally unique across newly issued credentials, even if
