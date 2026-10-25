@@ -93,7 +93,7 @@ export async function employeeLogin(key: string, password: string, rememberDevic
       !result.AuthenticationResult.ExpiresIn)
     throw new Error("บัญชีพนักงานยังไม่สามารถเข้าสู่ระบบได้");
   const auth = result.AuthenticationResult;
-  saveSession({ access: auth.AccessToken, refresh: auth.RefreshToken,
+  saveSession({ access: auth.AccessToken!, refresh: auth.RefreshToken!,
     expiresAt: Date.now() + (auth.ExpiresIn ?? 0) * 1000 }, rememberDevice);
 }
 export async function employeeAccessToken(): Promise<string> {
