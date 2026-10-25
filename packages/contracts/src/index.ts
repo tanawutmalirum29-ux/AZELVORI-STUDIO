@@ -185,6 +185,12 @@ export const LeadFollowUpSchema = z
   .strict();
 export type LeadFollowUp = z.infer<typeof LeadFollowUpSchema>;
 export const LeadRecordSchema = LeadFields.extend({
+  // Historic alpha leads remain readable after changing the consent text.
+  // New submissions must use the current PRIVACY_VERSION via LeadSchema.
+  privacyVersion: z.union([
+    z.literal(PRIVACY_VERSION),
+    z.literal("alpha-2026-10-23"),
+  ]),
   leadId: z.string().regex(/^LEAD-\d{4}-[A-F0-9]{16}$/),
   createdAt: z.iso.datetime(),
   status: z.enum(LEAD_STATUSES),
