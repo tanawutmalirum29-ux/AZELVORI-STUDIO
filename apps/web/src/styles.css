@@ -5278,3 +5278,8 @@ dd {
   .employee-panel { padding: 15px; }
   .employee-revoke-dialog { padding: 15px; }
 }
+
+/* Remembered-device controls for staff and studio. */
+.remember-device { display:flex; align-items:flex-start; gap:10px; cursor:pointer; color:#d0ded8; font-size:13px; line-height:1.55; }
+.remember-device input[type="checkbox"] { width:18px; min-height:18px; height:18px; margin:2px 0 0; flex-shrink:0; accent-color:#a8e8df; }
+.remember-device:focus-within { outline:2px solid #86d6c6; outline-offset:3px; border-radius:5px; }
