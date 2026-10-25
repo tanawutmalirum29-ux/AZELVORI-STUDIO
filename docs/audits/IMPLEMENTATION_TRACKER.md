@@ -6,7 +6,7 @@
 ## Changes implemented
 
 ### UX-01 — Employee one-time credential handoff
-- **Status: IN REVIEW** — [PR #10](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/pull/10); do not call this DONE until current SHA passes all CI and is merged.
+- **Status: CODE COMPLETE / QA PASSED** — [PR #10](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/pull/10) merged into `main` as [`576445d5`](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/commit/576445d5fe43a748285cf79f72896703a500c490). [CI for verified PR SHA — SUCCESS](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/actions/runs/40161965838). AWS Amplify/live production deployment **not verified**.
 - **Finding:** Audit "employee credentials" section (original report line 60): one-time secret is easy to lose or copy incorrectly, especially on a mobile device.
 - **Scope:** `apps/web/src/pages/AdminEmployees.tsx`, `apps/web/src/styles.css`, `tests/e2e-workspace/workspace.spec.ts`.
 - **Implementation:** mask password until toggled; dedicated copy key/password/bundle controls; fallback instruction when clipboard access is blocked; founder must explicitly tick saved-credentials confirmation before closing the one-time result.
@@ -35,9 +35,9 @@
 | Check | Status | Evidence |
 |---|---|---|
 | Source patch exists in PR | DONE | [PR #10](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/pull/10) |
-| GitHub CI on final PR SHA | PENDING | Check PR Actions |
-| Integration / browser QA on final PR SHA | PENDING | Check PR Actions |
-| Merge to `main` | PENDING | Confirm merge SHA |
+| GitHub CI on final PR SHA | PASS | [Run 40161965838 — success](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/actions/runs/40161965838) |
+| Integration / browser QA on final PR SHA | PASS (synthetic) | [Playwright Chromium/WebKit, configured viewports, and test suite](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/actions/runs/40161965838); not live AWS login |
+| Merge to `main` | DONE | [Merge commit `576445d5`](https://github.com/tanawutmalirum29-ux/AZELVORI-STUDIO/commit/576445d5fe43a748285cf79f72896703a500c490) |
 | Amplify frontend deployment | NOT VERIFIED | AWS Amplify job for merged SHA required |
 | Live manual check (iPad/mobile clipboard and credentials) | NOT VERIFIED | Needs safe test account; do not post secrets in issues |
 
