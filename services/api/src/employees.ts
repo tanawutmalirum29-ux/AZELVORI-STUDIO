@@ -154,6 +154,16 @@ export class EmployeeService {
       throw new HttpError(404, "NOT_FOUND", "ไม่พบคีย์พนักงาน");
     if (former.data.active)
       throw new HttpError(409, "EMPLOYEE_KEY_ACTIVE", "คีย์นี้ยังใช้งานอยู่ ต้องปิดก่อน");
+    // The original disable may have failed at Cognito after the database grant
+    // was revoked. Do not issue a replacement until the old login is disabled.
+    try {
+      await this.cognito.send(new AdminDisableUserCommand({
+        UserPoolId: this.pool,
+        Username: former.data.loginUsername ?? "emp-" + key,
+      }));
+    } catch (error) {
+      if (!(error instanceof Error && error.name === "UserNotFoundException")) throw error;
+    }
     return this.issue(actor, key, parsed.data, former);
   }
   async revoke(actor: Actor, code: string) {
