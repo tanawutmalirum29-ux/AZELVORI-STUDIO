@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Notice } from "./Layout";
 import { Icon } from "./Icon";
 import { authConfigured, logout, signIn } from "../lib/auth";
@@ -6,6 +6,7 @@ import {
   answerNativeChallenge,
   confirmPasswordRecovery,
   directConfigured,
+  hasNativeSession,
   logoutNative,
   readableNativeError,
   startNativeLogin,
@@ -38,6 +39,26 @@ export function FirstPartyLogin({ mode, denied = false, reason = "" }: {
   const configured = directConfigured && /^https:\/\//.test(apiBase);
   const destination = mode === "admin" ? "/admin" :
     new URLSearchParams(location.search).get("continue") === "invite" ? "/invite" : "/app";
+
+  useEffect(() => {
+    if (denied || !hasNativeSession()) return;
+    let mounted = true;
+    void workspaceApi.me().then(async (me) => {
+      if (!mounted) return;
+      if (mode === "admin" && !me.staff) {
+        await logoutNative();
+        if (mounted) setError("บัญชีนี้ยังไม่มีสิทธิ์ผู้ดูแล");
+        return;
+      }
+      location.replace(destination);
+    }).catch((failure: unknown) => {
+      if (!mounted) return;
+      if (failure instanceof ApiError && [401, 403].includes(failure.status)) {
+        void logoutNative();
+      }
+    });
+    return () => { mounted = false; };
+  }, [denied, mode, destination]);
 
   function report(error: unknown) {
     setError(readableNativeError(error));
