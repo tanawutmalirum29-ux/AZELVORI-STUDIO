@@ -21,6 +21,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:workspace": "playwright test --config playwright.workspace.config.ts",
+    "test:e2e:public": "playwright test --config playwright.public.config.ts",
     "infra:synth": "npm run build:api && cdk synth --app 'node --import tsx infrastructure/cdk/app.ts' --output cdk.out",
     "build:api": "node scripts/build-api.mjs",
     "check": "npm run typecheck && npm test && npm run build"
