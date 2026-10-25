@@ -412,7 +412,7 @@ export class FoundationStack extends Stack {
       evaluationPeriods: 1,
       treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
       alarmDescription:
-        "Connect an operational notification action before opening intake",
+        "Configure an SNS alarm notification destination and test it for sustained public beta",
     });
     if (options.budgetEmail && options.budgetUsd)
       new budgets.CfnBudget(this, "MonthlyBudget", {
