@@ -19,7 +19,7 @@ export async function employeeRoute(
 ) {
   const path = event.rawPath, method = event.requestContext.http.method;
   const isAdmin = path === "/api/v1/admin/employees" ||
-    /^\/api\/v1\/admin\/employees\/\d{5,}\/revoke$/.test(path);
+    /^\/api\/v1\/admin\/employees\/\d{5,}\/(revoke|reissue)$/.test(path);
   const isEmployee = path === "/api/v1/employee/me" ||
     path === "/api/v1/employee/projects" || path === "/api/v1/employee/leads" ||
     /^\/api\/v1\/employee\/leads\/[^/]+\/acknowledge$/.test(path) ||
@@ -37,6 +37,8 @@ export async function employeeRoute(
       return result(await employee.create(actor, parseBody(event)), 201);
     if (method === "POST" && path.endsWith("/revoke"))
       return result(await employee.revoke(actor, path.split("/")[5]));
+    if (method === "POST" && path.endsWith("/reissue"))
+      return result(await employee.reissue(actor, path.split("/")[5], parseBody(event)), 201);
   }
   if (isEmployee) {
     // Only the dedicated employee Cognito user-pool JWT authorizer is attached
