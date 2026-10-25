@@ -27,8 +27,8 @@ export function auth() {
       silentRequestTimeoutInSeconds: 15,
       requestTimeoutInSeconds: 15,
       loadUserInfo: false,
-      // OAuth fallback also survives tab closures; PKCE request state stays per-tab.
-      userStore: new WebStorageStateStore({ store: localStorage }),
+      // Hosted OAuth fallback stays tab-scoped; first-party login has an explicit trusted-device option.
+      userStore: new WebStorageStateStore({ store: sessionStorage }),
       stateStore: new WebStorageStateStore({ store: sessionStorage }),
       metadata: {
         issuer: authority,
