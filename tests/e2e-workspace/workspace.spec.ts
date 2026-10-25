@@ -314,7 +314,7 @@ test("founder pilot creates a real-backed synthetic lead flow without opening pu
   expect(state.lead.title).toContain("[TEST PILOT]");
   expect(state.lead.contactEmail).toBe("pilot@example.com");
   await expect(page.getByRole("button", { name: "สร้างบรีฟทดสอบในฐานข้อมูลจริง" })).toHaveCount(0);
-  await page.getByRole("link", { name: "คิวงานแอดมิน" }).click();
+  await page.getByRole("link", { name: "คิวงาน", exact: true }).click();
   await expect(page).toHaveURL(/\/admin$/);
   await expect(page.getByText(/TEST PILOT/).first()).toBeVisible();
   await layout(page, info, "live-founder-pilot");
