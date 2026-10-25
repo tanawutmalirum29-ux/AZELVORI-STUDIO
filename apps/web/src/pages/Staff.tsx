@@ -99,7 +99,7 @@ export function StaffInbox() {
   const pending = useRef<{ key: string; text: string; project: string } | undefined>(undefined);
   const lock = useRef(false);
   function handleError(err: unknown) {
-    if ((err as ApiError)?.status === 403 || (err as ApiError)?.status === 401) {
+    if (!employeeSessionExists() || (err as ApiError)?.status === 403 || (err as ApiError)?.status === 401) {
       clearEmployeeSession();
       location.assign("/staff/login");
       return;
@@ -109,6 +109,15 @@ export function StaffInbox() {
   useEffect(() => {
     if (!employeeSessionExists()) { location.replace("/staff/login"); return; }
     let active = true;
+    // Recheck employee authorization even with no open conversation. A founder
+    // can disable a key at any moment, independently of refresh-token expiry.
+    const verifyActive = () => {
+      if (active && !document.hidden) void staffApi<Employee>("/me")
+        .catch((err) => { if (active) handleError(err); });
+    };
+    const activeInterval = setInterval(verifyActive, 60000);
+    const onVisible = () => { if (!document.hidden) verifyActive(); };
+    document.addEventListener("visibilitychange", onVisible);
     void Promise.all([
       staffApi<Employee>("/me"),
       staffApi<{items: StudioProject[]; nextCursor?: string}>("/projects"),
@@ -118,7 +127,8 @@ export function StaffInbox() {
       setSelected(page.items[0]?.projectId);
     }).catch((err) => { if (active) handleError(err); })
       .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    return () => { active = false; clearInterval(activeInterval);
+      document.removeEventListener("visibilitychange", onVisible); };
   }, []);
   useEffect(() => {
     if (!selected) return;
