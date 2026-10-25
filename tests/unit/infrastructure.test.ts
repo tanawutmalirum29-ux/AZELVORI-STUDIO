@@ -61,6 +61,44 @@ describe("AWS foundation safeguards", () => {
     });
     template.hasOutput("PilotEnabled", { Value: "true" });
   });
+  it("opens public beta in staging only after legal approval and verified privacy contact", () => {
+    const beta = {
+      ...options,
+      stage: "staging" as const,
+      appOrigin: "https://studio.example",
+      intakeEnabled: true,
+      publicBetaMode: true,
+      pilotEnabled: false,
+      legalReady: true,
+      privacyContactEmail: "privacy@example.test",
+      lambdaConcurrency: "shared" as const,
+    };
+    expect(() => validateOptions(beta)).not.toThrow();
+    for (const invalid of [
+      { ...beta, legalReady: false },
+      { ...beta, privacyContactEmail: "" },
+      { ...beta, privacyContactEmail: "not-an-email" },
+      { ...beta, pilotEnabled: true },
+      { ...beta, stage: "prod" as const, budgetUsd: 10, budgetEmail: "ops@example.test" },
+      { ...beta, stage: "dev" as const },
+    ]) expect(() => validateOptions(invalid)).toThrow();
+    expect(() => validateOptions({ ...beta, publicBetaMode: false })).toThrow("Shared Lambda");
+    const t = Template.fromStack(new FoundationStack(new App(), "PublicBeta", beta));
+    t.hasResourceProperties("AWS::Lambda::Function", {
+      Environment: { Variables: Match.objectLike({
+        INTAKE_ENABLED: "true", PILOT_ENABLED: "false",
+      }) },
+    });
+    t.hasResourceProperties("AWS::ApiGatewayV2::Stage", {
+      DefaultRouteSettings: { ThrottlingBurstLimit: 2, ThrottlingRateLimit: 1 },
+    });
+    t.hasOutput("IntakeEnabled", { Value: "true" });
+    t.hasOutput("PublicBetaMode", { Value: "true" });
+    t.hasResourceProperties("AWS::ApiGatewayV2::Route", {
+      RouteKey: "POST /api/v1/leads",
+      AuthorizationType: "NONE",
+    });
+  });
   it("MFA, private identity, scoped JWT routes, retention and disabled intake are synthesized", () => {
     const template = Template.fromStack(
       new FoundationStack(new App(), "Test", options),
