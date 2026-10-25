@@ -139,7 +139,7 @@ export class FoundationStack extends Stack {
       preventUserExistenceErrors: true,
       accessTokenValidity: Duration.minutes(5),
       idTokenValidity: Duration.minutes(5),
-      refreshTokenValidity: Duration.hours(8),
+      refreshTokenValidity: Duration.days(365),
     });
     const scopeAccess = new cognito.ResourceServerScope({
       scopeName: "access",
@@ -158,7 +158,7 @@ export class FoundationStack extends Stack {
       authFlows: { userSrp: true, userPassword: true },
       accessTokenValidity: Duration.minutes(5),
       idTokenValidity: Duration.minutes(5),
-      refreshTokenValidity: Duration.hours(8),
+      refreshTokenValidity: Duration.days(30),
       oAuth: {
         flows: { authorizationCodeGrant: true },
         scopes: [
